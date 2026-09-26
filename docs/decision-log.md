@@ -187,4 +187,50 @@
 
 ---
 
+## 9. 백엔드/DB 재검토 — NestJS + PostgreSQL(직접 설계)
+
+당초 Next.js API Route + Supabase로 잡았던 백엔드를 재검토:
+
+- 백엔드를 **NestJS**로 별도 구축하기로 함 (Next.js API Route에서 분리)
+- DB는 Supabase(매니지드 BaaS) 대신 **PostgreSQL을 직접 설계**하기로 함 — SQL 기반 스택을 최종 목표로 삼고 있어, 복잡한 관계형 스키마를 스스로 설계·운영해보는 것 자체가 목적
+- ORM은 **TypeORM** 채택 (NestJS 공식 문서가 기본으로 다루는 조합), 단 마이그레이션은 자동생성 대신 **raw SQL로 직접 작성** — "SQL을 직접 짜본다"는 학습 목표에 가장 직접적으로 닿는 부분
+- 로컬 개발은 Docker Compose Postgres, 배포는 Neon/Railway 등 순수 매니지드 Postgres
+
+실제 스키마 초안:
+
+```
+repos            (id, name, local_path, github_full_name)
+captures         (id, user_id, repo_id FK nullable, type[voice|tag], content, source[desktop|mobile], captured_at)
+sessions         (id, started_at, ended_at, trigger_type[idle_resume|manual])
+session_captures (session_id FK, capture_id FK)   -- N:M
+github_events    (id, repo_id FK, event_type, committed_at)
+notion_events    (id, page_id, edited_at)
+study_notes      (id, uploaded_at, source_pdf_path, extracted_summary, repo_id FK nullable)
+```
+
+## 10. 모노레포 채택
+
+모바일(Expo)/데스크톱(Tauri)/백엔드(NestJS) 세 앱을 하나의 레포로 관리하기로 결정. 근거:
+
+1. **API 계약 공유**: 세 앱이 같은 캡처 API(Capture, Session)를 주고받음. 이미 핵심 스택인 Zod로 스키마를 `packages/shared-types`에 한 번만 정의하면, 백엔드는 `nestjs-zod` 등으로 DTO 검증에, 두 클라이언트는 React Hook Form + Zod 폼 검증에 그대로 재사용 가능. 레포가 나뉘면 이 스키마를 패키지로 배포·버전 관리해야 하는 오버헤드가 생김
+2. **원자적 스키마 변경**: DB 마이그레이션 하나가 API DTO + 모바일/데스크톱 클라이언트 코드를 동시에 바꿔야 하는 구조라, 한 커밋/PR로 세 곳을 함께 바꿀 수 있어야 배포 순서 문제(백엔드는 배포됐는데 클라이언트가 옛 스키마를 기대하는 등)를 피할 수 있음
+3. **1인 개발**: 멀티레포의 버전 태깅·cross-repo 이슈 트래킹 비용을 상쇄할 팀 단위 이점이 없는 개인 프로젝트
+
+**주의점**: 세 앱의 빌드 파이프라인이 서로 다름(Expo EAS / Tauri Cargo / NestJS Docker) → pnpm workspaces + Turborepo로 태스크를 스코프별로 분리해서 관리.
+
+```
+adhd-irection/
+├── apps/
+│   ├── mobile/       (Expo)
+│   ├── desktop/      (Tauri)
+│   └── api/          (NestJS)
+├── packages/
+│   └── shared-types/ (Capture/Session Zod 스키마 + API 타입)
+├── docs/
+├── pnpm-workspace.yaml
+└── turbo.json
+```
+
+---
+
 *이 문서는 실제 GitHub 로컬 저장소 커밋 이력 분석(2026-09-27 기준, 1,375건)을 근거로 작성됨.*

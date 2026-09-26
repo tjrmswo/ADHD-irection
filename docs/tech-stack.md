@@ -1,42 +1,48 @@
-# ADHD-irection 기술 스택 및 아키텍처
+# ADHD-irection 기술 스택 및 아키텍처 (확정)
 
-> 현재 확정된 상태를 정리한 문서. 결정이 바뀐 배경과 근거는 `decision-log.md` 참고.
+> 현재 확정된 상태 + 각 선택의 이유. 결정이 바뀐 과정과 실측 근거는 `decision-log.md` 참고.
 
 ## 프로젝트 개요
 
 집중력·단기 작업 기억이 좋지 않은 사용자(개발자 본인)를 위해, 코딩·학습·작업 전환 등의 패턴을 분석하고 인터럽트 발생 시점을 저마찰로 캡처해주는 개인용 시스템.
 
-## 레포 구조 — 모노레포
+## 확정 아키텍처
 
-세 앱(모바일/데스크톱/백엔드)이 같은 API 계약(Capture, Session 등)을 공유하고, 스키마 변경이 세 곳을 동시에 건드리는 구조라 모노레포로 관리한다. 빌드 파이프라인(Expo EAS / Tauri Cargo / NestJS Docker)이 서로 다르므로 pnpm workspaces + Turborepo로 태스크를 스코프별로 분리한다.
+![확정 아키텍처](assets/final-architecture.png)
 
-```
-adhd-irection/
-├── apps/
-│   ├── mobile/       (Expo)
-│   ├── desktop/      (Tauri)
-│   └── api/          (NestJS)
-├── packages/
-│   └── shared-types/ (Capture/Session Zod 스키마 + API 타입 — 3개 앱이 공유)
-├── docs/
-├── pnpm-workspace.yaml
-└── turbo.json
-```
+## 구성 요소와 선택 이유
 
-## 구성 요소
-
-| 구성 요소 | 역할 | 스택 |
+| 구성 요소 | 선택 | 이유 |
 |---|---|---|
-| 데스크톱 캡처 앱 | 실제 작업 전환 순간의 저마찰 캡처 (핵심) | Tauri — UI는 React/TS, 네이티브 셸(트레이 아이콘·전역 단축키·idle 감지)만 Rust |
-| 모바일 앱 | 이동 중 캡처, 학습노트 PDF 업로드, 패턴 대시보드 리뷰 | Expo (React Native) |
-| 백엔드 | 캡처 API, GitHub/Notion 웹훅 수신, 패턴 분석 | NestJS |
-| DB | 스키마 직접 설계 목적으로 매니지드 BaaS(Supabase) 대신 순수 Postgres 채택 | PostgreSQL + TypeORM (마이그레이션은 raw SQL로 직접 작성), 배포는 Neon/Railway |
+| **데스크톱 캡처 앱** | Tauri (Rust 셸 + React/TS UI) | 실제 작업 전환이 일어나는 곳은 모바일이 아니라 맥이라, 캡처 기능은 반드시 데스크톱에 있어야 함(1절 참고). Electron 대비 상시 상주 유틸리티로서 메모리 부담이 훨씬 적음 |
+| **모바일** | Next.js PWA (Expo/RN 대체) | 필요한 기능(음성 녹음, PDF 업로드, 대시보드 리뷰, iOS 16.4+ Web Push)이 PWA로 전부 커버됨. Expo 대신 이걸 쓰면 Apple Developer Program(연 $99)이 아예 불필요해지고, 기존 코어 스택(Next.js)을 그대로 재사용해 러닝커브가 더 낮음 |
+| **백엔드** | NestJS | Next.js API Route에서 분리해 별도 서버로 구축 — 구조화된 모듈/DTO 검증 등 프레임워크 지원이 필요한 규모로 판단 |
+| **DB** | PostgreSQL + TypeORM, 마이그레이션은 raw SQL 직접 작성 | Supabase 같은 매니지드 BaaS 대신 채택. SQL 기반 스택을 최종 목표로 삼고 있어 복잡한 관계형 스키마를 직접 설계·운영하는 경험 자체가 목적 |
+| **모노레포** | pnpm workspaces (`apps/mobile`, `apps/desktop`, `apps/api`, `packages/shared-types`) | 세 앱이 같은 API 계약(Zod 스키마)을 공유해야 하고, 스키마 변경이 세 곳을 동시에 건드리는 구조라 원자적 커밋 관리가 중요. 1인 개발이라 멀티레포 오버헤드를 감당할 이유가 없음 |
+| **Turborepo** | 보류 | 태스크 오케스트레이션/캐싱은 빌드가 실제로 아파질 때 필요한 최적화 레이어. 지금 구조(`apps/*`, `packages/*`)가 이미 Turborepo 표준 구조라 나중에 추가해도 마이그레이션 비용이 없음 — 그래서 지금 넣지 않음 |
+
+## 배포 (전부 무료/최소비용 티어)
+
+| 서비스 | 역할 | 비용 | 이유 |
+|---|---|---|---|
+| **Vercel** | Next.js PWA 호스팅 | 무료 티어 | Vercel은 Next.js에 최적화된 플랫폼. NestJS 같은 상시 실행 서버와 달리 PWA는 정적+서버리스라 궁합이 좋음 |
+| **Railway** | NestJS API 컨테이너 | Hobby $5/월 (고정) | Render 무료 티어는 15분 무활동 시 슬립되어 재기동 지연이 있음. 그 지연을 없애는 대가로 월 $5는 감수 가능한 수준으로 판단 |
+| **Neon** | PostgreSQL | 무료 티어 | 개인 캡처 데이터 규모에서 충분 |
+| **GitHub Actions** | CI(lint/test) + 데스크톱 릴리스 빌드(tauri-action) | **완전 무료** | 레포를 **public으로 유지**하는 한 러너 종류(Linux/macOS) 상관없이 무제한 무료. macOS 러너의 10배 과금 배수는 private 레포에만 적용되는 규정이라 이 프로젝트엔 해당 없음 |
+
+**예상 총 비용: 월 $5 (Railway 고정비)**, 나머지는 전부 $0.
+
+### 비용 상한선 원칙
+
+- 지금 단계: 월 $0~5 유지가 목표
+- AWS(ECS Fargate + RDS)로 확장 시: NAT Gateway를 켜지 않는 구조로 가면 월 1~1.5만원 선에서 가능 — **NAT Gateway를 실무처럼 그대로 쓰는 순간이 "미니 프로젝트 범위를 넘는" 실질적 경계선**
+- AWS 확장은 지금 당장 필요한 게 아니라 학습 목적의 다음 단계로 남겨둠 (자세한 로드맵은 `decision-log.md` 참고)
 
 ## 캡처 트리거 로직 (실측 데이터 기반)
 
 로컬 저장소 6개의 실제 커밋 이력 1,375건을 분석해 결정 — 근거는 `decision-log.md` 6~7절 참고.
 
-- **자동 트리거**: 시스템 유휴시간 20분 이상 지속 후 활동 재개(idle→resume) 시점에 캡처 모달 팝업. 직전 캡처로부터 20분 이내 재발생 안 함. 시간대 제한 없음(심야 작업 22.7%).
+- **자동 트리거**: 시스템 유휴시간 20분 이상 지속 후 활동 재개(idle→resume) 시점에 캡처 모달 팝업. 직전 캡처로부터 20분 이내 재발생 안 함. 시간대 제한 없음(심야 작업 22.7%)
 - **수동 트리거**: 전역 단축키로 항상 보조 가능
 - **보류**: 활성 창 전환 자동 감지(Accessibility API 기반) — 실측상 소수 케이스(6%)라 2단계로 연기
 
@@ -49,9 +55,6 @@ adhd-irection/
 ## 패턴 분석 방식
 
 OS 레벨 사용량 API(Android `UsageStatsManager`, iOS Screen Time 계열)는 권한 제약과 플랫폼 비대칭이 커서, 앱 자체 행동 로그(캡처 이벤트, 세션 로그)를 1차 신호로 사용한다.
-
-- **Android**: `UsageStatsManager`로 앱별 사용 시간 조회 가능 — 선택적 추가 기능
-- **iOS**: `DeviceActivity` 구조상 사용 데이터를 메인 앱으로 추출 불가 — 기대하지 않음
 
 ## 외부 데이터 소스 연동
 
@@ -72,3 +75,5 @@ OS 레벨 사용량 API(Android `UsageStatsManager`, iOS Screen Time 계열)는 
 
 - Samsung Notes 자유 필기 자산의 구조화된 데이터 전환(Excalidraw 등) — 우선순위 낮음
 - 활성 창 전환 자동 감지 — 2단계 이후 재검토
+- Turborepo 도입 — 재도입 트리거 발생 시 (`decision-log.md` 참고)
+- AWS(ECS Fargate + RDS) 확장 — 학습 목적, 시점 미정

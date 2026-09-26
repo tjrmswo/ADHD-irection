@@ -233,4 +233,56 @@ adhd-irection/
 
 ---
 
+## 11. Turborepo 도입 보류
+
+pnpm workspaces는 채택하되, Turborepo는 지금 넣지 않기로 함.
+
+**이유**: Turborepo가 값어치를 하는 상황은 ①빌드 시간이 CI에서 실제로 아파질 때 ②`shared-types` 변경 순서 문제가 실제로 버그를 낸 적이 있을 때 ③여러 명이 캐시를 공유해야 할 때인데, 지금은 1인 개발·앱 3개·CI 없음 단계라 셋 다 해당 안 됨. `packages/shared-types`가 순수 TypeScript라 tsconfig `paths`로 소스를 직접 참조하면 "먼저 빌드해야 하는 순서" 문제 자체가 애초에 안 생김. 세 앱 동시 실행은 `concurrently` + pnpm 스크립트로 충분.
+
+**나중에 추가할 때 비용이 거의 0인 이유**: 지금 구조(`apps/*`, `packages/*`)가 이미 Turborepo가 기대하는 표준 구조라, 필요해지면 `turbo.json` 추가 + 스크립트를 `turbo run dev`로 바꾸기만 하면 됨. 폴더 재구성이 필요 없어서 "일단 넣어두고 익숙해지자"가 아니라 "필요해질 때 넣어도 손해 없다"는 계산이 성립.
+
+**재도입 트리거**: `pnpm run dev` 스크립트가 손으로 관리하기 번거로워질 때 / shared-types 변경 후 특정 앱이 옛 버전을 참조해 버그가 난 적이 있을 때 / CI를 붙였는데 매번 전체 재빌드로 시간이 아깝게 느껴질 때.
+
+## 12. 모바일 앱 재검토 — Expo 대신 Next.js PWA
+
+Apple Developer Program(연 $99)이 미니 프로젝트 치고 비싸다는 문제 제기에서 시작된 재검토.
+
+**검토 배경**: 모바일 앱에 실제로 필요한 기능은 ①음성 녹음(캡처) ②PDF 업로드(학습노트) ③패턴 대시보드 리뷰 세 가지뿐. 자동 이탈 감지 같은 OS 레벨 트리거는 이미 3절에서 데스크톱으로 옮겨놨기 때문에, 모바일에 네이티브 모듈이 필요한 이유가 애초에 없었음.
+
+**확인한 사실**: 이 세 기능은 전부 iOS Safari/PWA로 커버됨 —
+- 음성 녹음: `MediaRecorder` API, iOS 14.3+
+- PDF 업로드: `<input type="file">`로 파일 앱 접근
+- 푸시 알림(필요해질 경우): iOS 16.4+부터 홈 화면에 추가된 PWA에 한해 Web Push 지원, **Apple Developer Program 없이도 동작**
+
+**결정**: `apps/mobile`을 Expo(React Native) 대신 **Next.js PWA**로 변경. 부수 효과로 Expo보다 오히려 러닝커브가 낮아짐 — Next.js는 이미 근재님 코어 스택이라 새로 배울 게 없음. Apple Developer Program은 모바일 쪽에선 완전히 불필요해짐.
+
+## 13. 배포 플랫폼 선택
+
+**프론트(Next.js PWA) → Vercel**: Vercel은 Next.js에 최적화된 PaaS. 무료 티어(대역폭 100GB/월)로 개인 사용 트래픽은 충분히 커버.
+
+**백엔드(NestJS) → Railway (Render 대신)**: 처음엔 Render 무료 티어를 고려했으나, 15분 무활동 시 슬립되어 재기동 지연(수십 초)이 생기는 게 단점. Railway Hobby 플랜($5/월 고정 구독, $5어치 사용량 포함)으로 전환 — 슬립 없는 상시 실행의 대가로 월 $5는 감수 가능한 수준으로 판단. DB는 Railway가 아니라 Neon에 그대로 둬서 Railway 쪽 사용량을 API 서비스 하나로 최소화.
+
+**DB → Neon PostgreSQL**: 무료 티어로 개인 캡처 데이터 규모 충분히 커버.
+
+**주의**: Vercel은 애초에 NestJS 같은 상시 실행 서버에 안 맞는 플랫폼(서버리스 함수는 요청 시에만 켜졌다 꺼지는 구조라 DB 커넥션 풀 유지 등에 불리함) — 그래서 "Vercel이냐 AWS냐"가 아니라 처음부터 "프론트=Vercel, 백엔드=별도 상시 컨테이너"로 역할이 나뉘어 있었음.
+
+## 14. GitHub Actions 비용 재확인 — public 레포의 이점
+
+Tauri 데스크톱 릴리스 빌드는 macOS 러너가 필수(macOS 앱 서명/공증은 실제 macOS에서만 가능). macOS 러너는 분당 과금 배수가 Linux 대비 **10배**인데, 이 배수는 **private 레포에만 적용**된다는 걸 확인함. `tjrmswo/ADHD-irection`은 **public 레포**라서 GitHub 호스팅 러너는 OS 상관없이 무제한 무료 — macOS 러너 비용 걱정 자체가 이 프로젝트엔 해당 없음. (레포를 public으로 유지해야 하는 이유가 하나 더 생긴 셈.)
+
+## 15. 비용 상한선 정책
+
+미니 프로젝트 정체성을 지키기 위한 예산 가이드라인:
+
+| 단계 | 월 예산 상한선 |
+|---|---|
+| 현재 (Vercel+Railway+Neon+GitHub Actions) | **$5** (Railway 고정비만) |
+| 커스텀 도메인 추가 시 | +1~2천원/월 |
+| AWS 확장 시 (Fargate+RDS, NAT Gateway 회피) | 약 1~1.5만원/월 |
+| NAT Gateway를 실무처럼 그대로 쓸 때 | +4만원/월 — **이 지점부터 미니 프로젝트 범위를 넘어선 것으로 판단** |
+
+AWS(ECS Fargate + RDS + Terraform/CDK)는 학습 목적의 확장 방향으로 남겨두되, 지금 당장 옮길 이유는 없음. NAT Gateway를 켜는 순간이 실질적인 비용 경계선.
+
+---
+
 *이 문서는 실제 GitHub 로컬 저장소 커밋 이력 분석(2026-09-27 기준, 1,375건)을 근거로 작성됨.*

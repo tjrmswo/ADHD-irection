@@ -55,6 +55,56 @@ describe('POST /captures (e2e)', () => {
     expect(rows).toEqual([{ content: 'blocked', source: 'desktop' }]);
   });
 
+  it('맥락 필드를 보내지 않으면 null로 저장한다', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/captures')
+      .send(validBody)
+      .expect(201);
+    createdIds.push(res.body.id);
+
+    expect(CaptureSchema.parse(res.body)).toMatchObject({
+      triggerType: null,
+      activeApp: null,
+      windowTitle: null,
+    });
+  });
+
+  it('캡처 창이 뜬 계기와 직전에 쓰던 앱을 함께 저장한다', async () => {
+    const context = {
+      triggerType: 'idle_resume',
+      activeApp: 'Code',
+      windowTitle: 'captures.service.ts — ADHD-irection',
+    };
+    const res = await request(app.getHttpServer())
+      .post('/captures')
+      .send({ ...validBody, ...context })
+      .expect(201);
+    createdIds.push(res.body.id);
+    expect(CaptureSchema.parse(res.body)).toMatchObject(context);
+
+    const rows = await app
+      .get(DataSource)
+      .query(
+        'SELECT trigger_type, active_app, window_title FROM captures WHERE id = $1',
+        [res.body.id],
+      );
+    expect(rows).toEqual([
+      {
+        trigger_type: 'idle_resume',
+        active_app: 'Code',
+        window_title: 'captures.service.ts — ADHD-irection',
+      },
+    ]);
+  });
+
+  it('알 수 없는 triggerType은 400으로 거부한다', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/captures')
+      .send({ ...validBody, triggerType: 'timer' })
+      .expect(400);
+    expect(res.body.issues[0].path).toBe('triggerType');
+  });
+
   it('스키마에 맞지 않는 본문은 400으로 거부한다', async () => {
     const res = await request(app.getHttpServer())
       .post('/captures')

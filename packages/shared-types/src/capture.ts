@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SessionTriggerTypeSchema } from './session.ts';
 
 export const CaptureTypeSchema = z.enum(['voice', 'tag']);
 export type CaptureType = z.infer<typeof CaptureTypeSchema>;
@@ -31,19 +32,34 @@ export const CaptureSchema = z.object({
   content: z.string(),
   source: CaptureSourceSchema,
   capturedAt: z.iso.datetime({ offset: true }),
+  // 캡처 창이 뜬 계기. 이 컬럼이 생기기 전의 캡처와 웹 캡처는 null
+  triggerType: SessionTriggerTypeSchema.nullable(),
+  // 캡처 창이 뜨기 직전에 맨 앞에 있던 앱. 알 수 없으면 null
+  activeApp: z.string().max(200).nullable(),
+  // 그 앱의 창 제목. macOS 화면 기록 권한이 없으면 null
+  windowTitle: z.string().max(500).nullable(),
 });
 export type Capture = z.infer<typeof CaptureSchema>;
 
+// 맥락 필드는 보내지 않으면 null로 저장한다.
 export const CreateCaptureSchema = CaptureSchema.omit({
   id: true,
   userId: true,
-}).refine(
-  (capture) =>
-    capture.type !== 'tag' ||
-    PresetTagSchema.safeParse(capture.content).success,
-  { path: ['content'], error: 'tag 캡처의 content는 프리셋 태그여야 합니다' },
-);
+})
+  .extend({
+    triggerType: CaptureSchema.shape.triggerType.default(null),
+    activeApp: CaptureSchema.shape.activeApp.default(null),
+    windowTitle: CaptureSchema.shape.windowTitle.default(null),
+  })
+  .refine(
+    (capture) =>
+      capture.type !== 'tag' ||
+      PresetTagSchema.safeParse(capture.content).success,
+    { path: ['content'], error: 'tag 캡처의 content는 프리셋 태그여야 합니다' },
+  );
 export type CreateCapture = z.infer<typeof CreateCaptureSchema>;
+// 보내는 쪽 타입 — 맥락 필드를 생략할 수 있다.
+export type CreateCaptureInput = z.input<typeof CreateCaptureSchema>;
 
 // GET /captures 쿼리. 쿼리스트링은 문자열로 오므로 limit은 숫자로 변환한다.
 export const ListCapturesQuerySchema = z.object({

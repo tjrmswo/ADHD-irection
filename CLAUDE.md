@@ -5,8 +5,9 @@
 ## 현재 상태
 
 - 기획·기술 스택 확정, 모노레포 스캐폴딩 완료 (각 앱은 생성기 기본 템플릿 상태, 기능 코드는 아직 없음).
-- 실행: `pnpm dev`(전체) / `pnpm dev:api`(4000) / `pnpm dev:web`(3000) / `pnpm dev:desktop`(Rust 툴체인 필요, API가 떠 있어야 저장됨)
-- 데스크톱 캡처 트리거 두 가지 구현됨: 수동(Option+Shift+C), 자동(유휴 20분→복귀). 자동 트리거 확인은 `pnpm dev:desktop:idle10`(임계값 10초, 터미널에 `[idle]` 로그 출력). Rust 테스트는 `apps/desktop/src-tauri`에서 `cargo test`. 검증: `pnpm typecheck && pnpm build && pnpm test && pnpm lint`
+- 한 번에 켜고 끄기: `pnpm start`(DB + API + 웹 + 데스크톱. Ctrl+C 또는 메뉴바 아이콘 → 종료로 DB까지 전부 꺼짐) / `pnpm stop`(따로 띄운 것까지 전부 종료). dev 서버가 떠 있는 동안 `pnpm build`를 돌리면 API watch가 멈출 수 있음
+- 개별 실행: `pnpm dev`(DB 제외 전체) / `pnpm dev:api`(4000) / `pnpm dev:web`(3000) / `pnpm dev:desktop`(Rust 툴체인 필요, API가 떠 있어야 저장됨)
+- 데스크톱 캡처 트리거 두 가지 구현됨: 수동(Option+Shift+C 또는 메뉴바 아이콘 → 캡처), 자동(유휴 20분→복귀). Dock에는 안 뜨고 메뉴바에 상주하며 종료는 메뉴바 아이콘 → 종료. 캡처마다 계기(`trigger_type`)와 직전에 쓰던 앱(`active_app`)을 함께 저장하고, 창 제목(`window_title`)은 macOS 화면 기록 권한이 있을 때만 채워짐(개발 빌드에서는 기록되는 것 확인)(터미널에 `[capture]` 로그 출력). 자동 트리거 확인은 `pnpm dev:desktop:idle10`(임계값 10초, 터미널에 `[idle]` 로그 출력). Rust 테스트는 `apps/desktop/src-tauri`에서 `cargo test`. 검증: `pnpm typecheck && pnpm build && pnpm test && pnpm lint`
 - DB: 초기 스키마 마이그레이션 작성 완료 (`apps/api/src/database/migrations/`). 로컬 실행은 `pnpm db:up`(Docker 필요) → `apps/api/.env.example`을 `.env`로 복사 → `pnpm db:migrate`. Nest 앱은 `TypeOrmModule`로 DB에 연결됨(`GET /health`로 확인). 기능 모듈은 `captures`(`POST /captures` 임시 유저로 저장, `GET /captures` 최신순 조회)만 있음. 웹은 `/captures`에 캡처 기록 화면만 있음(`pnpm dev:api`가 떠 있어야 함). API e2e 테스트(`pnpm --filter @adhd-irection/api test:e2e`)는 로컬 DB가 떠 있어야 함
 - 확정된 스택 전체와 선택 이유: @docs/tech-stack.md
 - 결정이 바뀐 과정과 실측 데이터 근거(커밋 1,375건 분석 등) — 필요할 때만 `docs/decision-log.md` 열어볼 것. 매 세션 자동 로드 대상 아님.
@@ -22,9 +23,8 @@
 
 ## 지금 할 일 (우선순위 순)
 
-1. 데스크톱 메뉴바 아이콘(Dock 대신 상주, 종료 메뉴)
-2. 캡처 시점 활성 앱 정보 자동 기록 (컬럼 추가 마이그레이션 필요, 트리거 종류 컬럼도 함께 검토 — `docs/decision-log.md` 21절)
-3. 음성 메모 캡처 + 비동기 STT
+1. 음성 메모 캡처 + 비동기 STT
+2. 배포용 앱에서도 창 제목이 기록되는지 확인 (`docs/decision-log.md` 22절)
 
 ## 작업 규칙
 

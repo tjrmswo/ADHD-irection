@@ -2,13 +2,23 @@ import {
   CaptureSchema,
   CreateCaptureSchema,
   type Capture,
+  type CreateCaptureInput,
   type PresetTag,
 } from "@adhd-irection/shared-types";
+import { invoke } from "@tauri-apps/api/core";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
+// 캡처 창이 뜬 순간 Rust 쪽이 기록해 둔 맥락 (계기, 직전에 쓰던 앱).
+type CaptureContext = Pick<
+  CreateCaptureInput,
+  "triggerType" | "activeApp" | "windowTitle"
+>;
+
 export async function createTagCapture(tag: PresetTag): Promise<Capture> {
+  const context = await invoke<CaptureContext | null>("capture_context");
   const body = CreateCaptureSchema.parse({
+    ...context,
     repoId: null,
     type: "tag",
     content: tag,

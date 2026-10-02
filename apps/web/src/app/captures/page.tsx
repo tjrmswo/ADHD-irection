@@ -29,6 +29,11 @@ const SOURCE_LABELS: Record<Capture["source"], string> = {
   web: "웹",
 };
 
+const TRIGGER_LABELS: Record<NonNullable<Capture["triggerType"]>, string> = {
+  idle_resume: "복귀",
+  manual: "수동",
+};
+
 function contentLabel(capture: Capture): string {
   const tag = PresetTagSchema.safeParse(capture.content);
   return capture.type === "tag" && tag.success
@@ -98,11 +103,19 @@ export default async function CapturesPage({
                 >
                   {timeFormat.format(new Date(capture.capturedAt))}
                 </time>
-                <span className="min-w-0 flex-1 break-words">
-                  {contentLabel(capture)}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="break-words">{contentLabel(capture)}</p>
+                  {capture.activeApp && (
+                    <p className="truncate text-sm text-zinc-500">
+                      {capture.activeApp}
+                      {capture.windowTitle && ` — ${capture.windowTitle}`}
+                    </p>
+                  )}
+                </div>
                 <span className="shrink-0 text-xs text-zinc-500">
                   {SOURCE_LABELS[capture.source]}
+                  {capture.triggerType &&
+                    ` · ${TRIGGER_LABELS[capture.triggerType]}`}
                 </span>
               </li>
             ))}

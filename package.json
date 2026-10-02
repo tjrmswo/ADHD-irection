@@ -6,6 +6,8 @@
     "node": ">=24"
   },
   "scripts": {
+    "start": "pnpm db:up && concurrently -k -n api,web,desktop -c blue,green,magenta \"pnpm dev:api\" \"pnpm dev:web\" \"pnpm dev:desktop\"; pnpm db:down",
+    "stop": "sh scripts/stop.sh",
     "dev": "concurrently -n api,web,desktop -c blue,green,magenta \"pnpm dev:api\" \"pnpm dev:web\" \"pnpm dev:desktop\"",
     "dev:api": "pnpm --filter @adhd-irection/api start:dev",
     "dev:web": "pnpm --filter @adhd-irection/web dev",

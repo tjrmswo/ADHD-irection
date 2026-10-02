@@ -293,7 +293,25 @@ AWS(ECS Fargate + RDS + Terraform/CDK)는 학습 목적의 확장 방향으로 �
 
 ## 17. `apps/mobile` → `apps/web` 이름 변경 (2026-10-02)
 
-Next.js PWA는 폰 전용이 아니라 캡처를 제외한 모든 화면(패턴 대시보드, 캡처 기록 조회, 학습노트 PDF 업로드, 이동 중 캡처)을 담당하고, 맥 브라우저에서도 주로 쓰게 됨. `mobile`이라는 이름이 실제 역할보다 좁아서 `apps/web`(패키지명 `@adhd-irection/web`)으로 변경. 역할 분담 자체는 그대로 — `apps/desktop`(Tauri)은 OS 권한이 필요한 캡처 순간만 담당. 캡처의 `source` 값(`desktop` | `mobile`)은 9절 초안 그대로 유지.
+Next.js PWA는 폰 전용이 아니라 캡처를 제외한 모든 화면(패턴 대시보드, 캡처 기록 조회, 학습노트 PDF 업로드, 이동 중 캡처)을 담당하고, 맥 브라우저에서도 주로 쓰게 됨. `mobile`이라는 이름이 실제 역할보다 좁아서 `apps/web`(패키지명 `@adhd-irection/web`)으로 변경. 역할 분담 자체는 그대로 — `apps/desktop`(Tauri)은 OS 권한이 필요한 캡처 순간만 담당. 캡처의 `source` 값은 18절에서 `desktop` | `web`으로 변경.
+
+## 18. 초기 스키마 마이그레이션 작성 시 정한 세부 사항 (2026-10-02)
+
+9절 초안 7개 테이블 + `users`를 `apps/api/src/database/migrations/1790920800000-InitSchema.ts`에 raw SQL로 작성. 초안에 없던 부분은 다음과 같이 정함:
+
+- **PK**: 전부 `uuid` + `DEFAULT gen_random_uuid()` (Postgres 13+ 내장, 확장 불필요)
+- **열거형 값**: Postgres `ENUM` 타입 대신 `text` + `CHECK` 제약. 값 추가/삭제가 제약 하나 교체로 끝나고, ENUM은 값 삭제가 불가능해서 초기 단계엔 CHECK가 다루기 쉬움
+- **시각 컬럼**: 전부 `timestamptz`
+- **`users` 테이블 추가**: 초안에는 없었지만 `captures.user_id`가 가리킬 대상이 필요해서 최소 컬럼(`id`, `name`, `created_at`)으로 추가하고 FK(`ON DELETE CASCADE`)를 걺. 인증은 **카카오 로그인을 NestJS로 직접 구현**할 계획이고, 그때 `kakao_id` 등은 새 마이그레이션으로 추가. 그 전까지는 `SeedTempUser` 마이그레이션이 넣는 임시 유저(`00000000-0000-4000-8000-000000000001`) 하나로 테스트
+- **`captures.source` 값**: 9절 초안의 `desktop | mobile`을 `desktop | web`으로 변경 (17절에서 앱 이름을 `apps/web`으로 바꾼 것과 맞춤. 맥 브라우저에서 한 캡처가 `mobile`로 찍히는 어색함 제거)
+- **삭제 동작**: repo 삭제 시 `captures`/`study_notes`의 `repo_id`는 `SET NULL`(기록은 남김), `github_events`는 `CASCADE`. `session_captures`는 양쪽 다 `CASCADE`
+- **`sessions`**: `ended_at`은 nullable(진행 중), `ended_at >= started_at` CHECK 추가
+- **인덱스**: 시간순 조회용(`captured_at`, `started_at`, `committed_at`, `edited_at`, `uploaded_at`)과 FK 역방향 조회용만 추가
+- **로컬 Postgres 버전**: `postgres:17-alpine`
+
+**검증**: 작성 시점에 맥에 Docker가 없어서 Docker Compose로는 못 돌려봄. 대신 임시 Postgres(embedded-postgres 18.4)에 `migration:run` → 제약/CASCADE 동작 확인 → `migration:revert` → 재실행까지 통과. 이후 Docker 설치 뒤 `pnpm db:up` → `pnpm db:migrate`도 로컬에서 통과 확인.
+
+**Nest ↔ DB 연결**: `@nestjs/typeorm`의 `TypeOrmModule.forRoot()`에 CLI와 같은 `data-source.ts` 설정을 그대로 넘김(설정 한 곳). `.env` 로딩은 `@nestjs/config` 없이 Node 내장 `process.loadEnvFile`로 처리 — 환경변수가 `DATABASE_URL` 하나뿐이라 패키지를 더 얹지 않음. 마이그레이션은 앱 기동 시 자동 실행하지 않고 `pnpm db:migrate`로만 실행.
 
 ---
 

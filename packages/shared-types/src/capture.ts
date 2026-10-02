@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const CaptureTypeSchema = z.enum(['voice', 'tag']);
 export type CaptureType = z.infer<typeof CaptureTypeSchema>;
 
-export const CaptureSourceSchema = z.enum(['desktop', 'mobile']);
+export const CaptureSourceSchema = z.enum(['desktop', 'web']);
 export type CaptureSource = z.infer<typeof CaptureSourceSchema>;
 
 // 원탭 프리셋 태그: 막힘 / 거의 다 함 / 전환함 / 휴식

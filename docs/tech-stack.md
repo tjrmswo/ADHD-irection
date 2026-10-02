@@ -69,7 +69,7 @@ OS 레벨 사용량 API(Android `UsageStatsManager`, iOS Screen Time 계열)는 
 
 | 구성 요소 | 선택 | 이유 |
 |---|---|---|
-| **모노레포** | pnpm workspaces (`apps/mobile`, `apps/desktop`, `apps/api`, `packages/shared-types`) | 세 앱이 같은 API 계약(Zod 스키마)을 공유해야 하고, 스키마 변경이 세 곳을 동시에 건드리는 구조라 원자적 커밋 관리가 중요. 1인 개발이라 멀티레포 오버헤드를 감당할 이유가 없음 |
+| **모노레포** | pnpm workspaces (`apps/web`, `apps/desktop`, `apps/api`, `packages/shared-types`) | 세 앱이 같은 API 계약(Zod 스키마)을 공유해야 하고, 스키마 변경이 세 곳을 동시에 건드리는 구조라 원자적 커밋 관리가 중요. 1인 개발이라 멀티레포 오버헤드를 감당할 이유가 없음 |
 | **Turborepo** | 보류 | 태스크 오케스트레이션/캐싱은 빌드가 실제로 아파질 때 필요한 최적화 레이어. 지금 구조(`apps/*`, `packages/*`)가 이미 Turborepo 표준 구조라 나중에 추가해도 마이그레이션 비용이 없음 — 그래서 지금 넣지 않음 |
 
 ### 배포 (전부 무료/최소비용 티어)

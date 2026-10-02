@@ -283,6 +283,18 @@ Tauri 데스크톱 릴리스 빌드는 macOS 러너가 필수(macOS 앱 서명/�
 
 AWS(ECS Fargate + RDS + Terraform/CDK)는 학습 목적의 확장 방향으로 남겨두되, 지금 당장 옮길 이유는 없음. NAT Gateway를 켜는 순간이 실질적인 비용 경계선.
 
+## 16. 모노레포 스캐폴딩 시 정한 세부 사항 (2026-10-02)
+
+- **shared-types 참조 방식**: 11절에서는 "tsconfig `paths`로 소스 직접 참조"라고 적었지만, 실제로는 `package.json`의 `exports`가 `./src/index.ts`를 가리키게 하고 각 앱이 `workspace:*`로 의존하는 방식으로 구현. 빌드 단계가 없다는 점은 동일하고, 앱마다 `paths`를 따로 맞출 필요가 없음. NestJS(ESM)는 런타임에 Node 24의 타입 스트리핑으로 `.ts`를 그대로 읽으므로 **shared-types는 지워지는 문법(enum·namespace 금지)만 쓰고 상대 import에 `.ts` 확장자를 붙여야 함** (`erasableSyntaxOnly`로 강제). Next.js는 `transpilePackages`, Vite는 별도 설정 없이 동작
+- **Node 24 이상 필수**: 위 타입 스트리핑 때문. Railway 배포 이미지도 Node 24로 맞춰야 함
+- **포트**: API 기본 포트를 4000으로 변경 (Next.js dev 서버 3000과 충돌 방지). Tauri dev는 1420
+- **ID 타입**: Zod 스키마에서 id를 UUID로 가정. 9절 초안에는 타입이 없었으므로 마이그레이션 작성 시 바꾸려면 `shared-types`도 함께 수정
+- **프리셋 태그 코드값**: `blocked`(막힘) / `almost_done`(거의 다 함) / `switched`(전환함) / `break`(휴식)
+
+## 17. `apps/mobile` → `apps/web` 이름 변경 (2026-10-02)
+
+Next.js PWA는 폰 전용이 아니라 캡처를 제외한 모든 화면(패턴 대시보드, 캡처 기록 조회, 학습노트 PDF 업로드, 이동 중 캡처)을 담당하고, 맥 브라우저에서도 주로 쓰게 됨. `mobile`이라는 이름이 실제 역할보다 좁아서 `apps/web`(패키지명 `@adhd-irection/web`)으로 변경. 역할 분담 자체는 그대로 — `apps/desktop`(Tauri)은 OS 권한이 필요한 캡처 순간만 담당. 캡처의 `source` 값(`desktop` | `mobile`)은 9절 초안 그대로 유지.
+
 ---
 
 *이 문서는 실제 GitHub 로컬 저장소 커밋 이력 분석(2026-09-27 기준, 1,375건)을 근거로 작성됨.*

@@ -1,4 +1,4 @@
-import { CaptureSchema } from '@adhd-irection/shared-types';
+import { CaptureListSchema, CaptureSchema } from '@adhd-irection/shared-types';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -78,5 +78,96 @@ describe('POST /captures (e2e)', () => {
       .post('/captures')
       .send({ ...validBody, repoId: '11111111-1111-4111-8111-111111111111' })
       .expect(400);
+  });
+});
+
+describe('GET /captures (e2e)', () => {
+  let app: INestApplication<App>;
+  // 실제 캡처와 섞이지 않도록 먼 과거 시각으로 넣고 before 커서로 그 구간만 조회한다.
+  const seeded = [
+    { content: 'blocked', capturedAt: '2001-01-01T00:00:00.000Z' },
+    { content: 'break', capturedAt: '2001-01-01T02:00:00.000Z' },
+    { content: 'switched', capturedAt: '2001-01-01T01:00:00.000Z' },
+  ];
+  const seededIds: string[] = [];
+
+  beforeAll(async () => {
+    const moduleFixture = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+    app = moduleFixture.createNestApplication();
+    await app.init();
+
+    for (const { content, capturedAt } of seeded) {
+      const res = await request(app.getHttpServer())
+        .post('/captures')
+        .send({
+          repoId: null,
+          type: 'tag',
+          content,
+          source: 'desktop',
+          capturedAt,
+        })
+        .expect(201);
+      seededIds.push(res.body.id);
+    }
+  });
+
+  afterAll(async () => {
+    await app
+      .get(DataSource)
+      .query('DELETE FROM captures WHERE id = ANY($1)', [seededIds]);
+    await app.close();
+  });
+
+  it('캡처를 최신순으로 돌려준다', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/captures')
+      .query({ before: '2001-01-02T00:00:00.000Z' })
+      .expect(200);
+
+    const captures = CaptureListSchema.parse(res.body);
+    expect(captures.map((capture) => capture.content)).toEqual([
+      'break',
+      'switched',
+      'blocked',
+    ]);
+  });
+
+  it('limit만큼만 돌려준다', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/captures')
+      .query({ before: '2001-01-02T00:00:00.000Z', limit: 2 })
+      .expect(200);
+    expect(res.body.map((c: { content: string }) => c.content)).toEqual([
+      'break',
+      'switched',
+    ]);
+  });
+
+  it('before 시각과 같거나 이후인 캡처는 제외한다', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/captures')
+      .query({ before: '2001-01-01T02:00:00.000Z' })
+      .expect(200);
+    expect(res.body.map((c: { content: string }) => c.content)).toEqual([
+      'switched',
+      'blocked',
+    ]);
+  });
+
+  it('쿼리 없이 호출하면 기본 개수 이하로 돌려준다', async () => {
+    const res = await request(app.getHttpServer()).get('/captures').expect(200);
+    expect(CaptureListSchema.parse(res.body).length).toBeLessThanOrEqual(50);
+  });
+
+  it('잘못된 쿼리는 400으로 거부한다', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/captures')
+      .query({ limit: 0, before: 'yesterday' })
+      .expect(400);
+    expect(res.body.issues.map((i: { path: string }) => i.path)).toEqual(
+      expect.arrayContaining(['limit', 'before']),
+    );
   });
 });

@@ -95,5 +95,6 @@ OS 레벨 사용량 API(Android `UsageStatsManager`, iOS Screen Time 계열)는 
 
 - Samsung Notes 자유 필기 자산의 구조화된 데이터 전환(Excalidraw 등) — 우선순위 낮음
 - 활성 창 전환 자동 감지 — 2단계 이후 재검토
+- 캡처 시점 화면 스크린샷 저장 — 활성 앱 이름·창 제목(텍스트) 기록을 먼저 써 보고 재검토 (`decision-log.md` 21절)
 - Turborepo 도입 — 재도입 트리거 발생 시 (`decision-log.md` 참고)
 - AWS(ECS Fargate + RDS) 확장 — 학습 목적, 시점 미정

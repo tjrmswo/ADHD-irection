@@ -1,0 +1,24 @@
+{
+  "name": "adhd-irection",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web,desktop -c blue,green,magenta \"pnpm dev:api\" \"pnpm dev:web\" \"pnpm dev:desktop\"",
+    "dev:api": "pnpm --filter @adhd-irection/api start:dev",
+    "dev:web": "pnpm --filter @adhd-irection/web dev",
+    "dev:desktop": "pnpm --filter @adhd-irection/desktop tauri dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @adhd-irection/api migration:run"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

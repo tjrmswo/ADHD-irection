@@ -5,6 +5,8 @@ services:
       POSTGRES_USER: adhd
       POSTGRES_PASSWORD: adhd
       POSTGRES_DB: adhd_irection
+    # 조회 결과를 한국 시간으로 표시한다. timestamptz에 저장되는 값(시각 자체)은 그대로다.
+    command: ["postgres", "-c", "timezone=Asia/Seoul"]
     ports:
       - "5432:5432"
     volumes:

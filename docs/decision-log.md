@@ -313,6 +313,14 @@ Next.js PWA는 폰 전용이 아니라 캡처를 제외한 모든 화면(패턴 
 
 **Nest ↔ DB 연결**: `@nestjs/typeorm`의 `TypeOrmModule.forRoot()`에 CLI와 같은 `data-source.ts` 설정을 그대로 넘김(설정 한 곳). `.env` 로딩은 `@nestjs/config` 없이 Node 내장 `process.loadEnvFile`로 처리 — 환경변수가 `DATABASE_URL` 하나뿐이라 패키지를 더 얹지 않음. 마이그레이션은 앱 기동 시 자동 실행하지 않고 `pnpm db:migrate`로만 실행.
 
+## 19. 데스크톱 캡처 MVP — 수동 단축키부터 (2026-10-02)
+
+- **트리거 순서**: idle→resume보다 전역 단축키를 먼저 구현. 누르면 바로 결과가 보여 검증이 쉽고, 캡처 모달·API 전송은 두 트리거가 공유하므로 idle 감지는 나중에 트리거만 덧붙이면 됨
+- **단축키**: `Option+Shift+C` (`tauri-plugin-global-shortcut`). 다른 앱과 충돌하면 `src-tauri/src/lib.rs`에서 변경
+- **캡처 창**: 앱 시작 시 숨겨진 상태로 떠 있다가 단축키로 표시. 저장 후 또는 Esc로 다시 숨김. 창을 닫아도 종료하지 않고 숨김 처리(단축키 유지 목적). 메뉴바(트레이) 아이콘은 아직 없음
+- **입력**: MVP는 프리셋 태그 4종만(숫자키 1~4 또는 클릭). 음성 메모는 STT 연동이 필요해 다음 단계
+- **API 호출**: 웹뷰에서 `fetch`로 직접 호출. 이를 위해 API에 CORS 허용 origin 추가(`http://localhost:1420`, `tauri://localhost`, `http://localhost:3000`). API 주소는 `VITE_API_URL`(기본 `http://localhost:4000`)
+
 ---
 
 *이 문서는 실제 GitHub 로컬 저장소 커밋 이력 분석(2026-09-27 기준, 1,375건)을 근거로 작성됨.*

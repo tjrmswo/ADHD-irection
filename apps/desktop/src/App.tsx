@@ -1,49 +1,80 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import {
+  PRESET_TAG_LABELS,
+  PresetTagSchema,
+  type PresetTag,
+} from "@adhd-irection/shared-types";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useCallback, useEffect, useState } from "react";
+import { createTagCapture } from "./api";
 import "./App.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+const TAGS = PresetTagSchema.options;
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+type Status =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved"; tag: PresetTag }
+  | { kind: "error"; message: string };
+
+function App() {
+  const [status, setStatus] = useState<Status>({ kind: "idle" });
+
+  const hide = useCallback(async () => {
+    await getCurrentWindow().hide();
+    setStatus({ kind: "idle" });
+  }, []);
+
+  const capture = useCallback(
+    async (tag: PresetTag) => {
+      setStatus({ kind: "saving" });
+      try {
+        await createTagCapture(tag);
+        setStatus({ kind: "saved", tag });
+        setTimeout(hide, 700);
+      } catch (error) {
+        setStatus({
+          kind: "error",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+    [hide],
+  );
+
+  const busy = status.kind === "saving" || status.kind === "saved";
+
+  // 1~4로 태그 선택, Esc로 닫기
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        void hide();
+        return;
+      }
+      const tag = TAGS[Number(event.key) - 1];
+      if (tag && !busy) void capture(tag);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [busy, capture, hide]);
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <main className="capture">
+      <h1>지금 어떤 상태였나요?</h1>
+      <div className="tags">
+        {TAGS.map((tag, index) => (
+          <button key={tag} disabled={busy} onClick={() => capture(tag)}>
+            <kbd>{index + 1}</kbd>
+            {PRESET_TAG_LABELS[tag]}
+          </button>
+        ))}
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
+      <p className={`status ${status.kind}`} role="status">
+        {status.kind === "saving" && "저장 중…"}
+        {status.kind === "saved" &&
+          `저장됨: ${PRESET_TAG_LABELS[status.tag]}`}
+        {status.kind === "error" && status.message}
+        {status.kind === "idle" && "Esc로 닫기"}
+      </p>
     </main>
   );
 }

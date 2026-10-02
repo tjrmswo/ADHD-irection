@@ -44,3 +44,14 @@ export const CreateCaptureSchema = CaptureSchema.omit({
   { path: ['content'], error: 'tag 캡처의 content는 프리셋 태그여야 합니다' },
 );
 export type CreateCapture = z.infer<typeof CreateCaptureSchema>;
+
+// GET /captures 쿼리. 쿼리스트링은 문자열로 오므로 limit은 숫자로 변환한다.
+export const ListCapturesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  // 이 시각보다 이전 캡처만 돌려준다 (다음 페이지 조회용 커서)
+  before: z.iso.datetime({ offset: true }).optional(),
+});
+export type ListCapturesQuery = z.infer<typeof ListCapturesQuerySchema>;
+
+// 최신순(capturedAt 내림차순)
+export const CaptureListSchema = z.array(CaptureSchema);

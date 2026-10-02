@@ -37,5 +37,10 @@ export type Capture = z.infer<typeof CaptureSchema>;
 export const CreateCaptureSchema = CaptureSchema.omit({
   id: true,
   userId: true,
-});
+}).refine(
+  (capture) =>
+    capture.type !== 'tag' ||
+    PresetTagSchema.safeParse(capture.content).success,
+  { path: ['content'], error: 'tag 캡처의 content는 프리셋 태그여야 합니다' },
+);
 export type CreateCapture = z.infer<typeof CreateCaptureSchema>;

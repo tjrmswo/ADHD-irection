@@ -22,6 +22,9 @@ function toCapture(entity: CaptureEntity): Capture {
     content: entity.content,
     source: entity.source,
     capturedAt: entity.capturedAt.toISOString(),
+    triggerType: entity.triggerType,
+    activeApp: entity.activeApp,
+    windowTitle: entity.windowTitle,
   };
 }
 

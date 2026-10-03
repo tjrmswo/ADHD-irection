@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
+import { GithubSyncService } from './github/github-sync.service.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -12,5 +13,6 @@ async function bootstrap() {
     ],
   });
   await app.listen(process.env.PORT ?? 4000);
+  app.get(GithubSyncService).start();
 }
 await bootstrap();

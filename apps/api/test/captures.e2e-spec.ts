@@ -206,6 +206,20 @@ describe('GET /captures (e2e)', () => {
     ]);
   });
 
+  it('after부터 before 전까지의 캡처만 돌려준다', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/captures')
+      .query({
+        // 한국 시간 2001-01-01 10:00 ~ 11:00 (UTC 01:00 ~ 02:00)
+        after: '2001-01-01T10:00:00+09:00',
+        before: '2001-01-01T11:00:00+09:00',
+      })
+      .expect(200);
+    expect(res.body.map((c: { content: string }) => c.content)).toEqual([
+      'switched',
+    ]);
+  });
+
   it('쿼리 없이 호출하면 기본 개수 이하로 돌려준다', async () => {
     const res = await request(app.getHttpServer()).get('/captures').expect(200);
     expect(CaptureListSchema.parse(res.body).length).toBeLessThanOrEqual(50);

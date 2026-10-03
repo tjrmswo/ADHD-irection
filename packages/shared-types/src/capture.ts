@@ -63,9 +63,11 @@ export type CreateCaptureInput = z.input<typeof CreateCaptureSchema>;
 
 // GET /captures 쿼리. 쿼리스트링은 문자열로 오므로 limit은 숫자로 변환한다.
 export const ListCapturesQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-  // 이 시각보다 이전 캡처만 돌려준다 (다음 페이지 조회용 커서)
+  limit: z.coerce.number().int().min(1).max(500).default(50),
+  // 이 시각보다 이전 캡처만 돌려준다 (기간의 끝, 끝 시각은 포함하지 않음)
   before: z.iso.datetime({ offset: true }).optional(),
+  // 이 시각부터의 캡처만 돌려준다 (기간의 시작, 시작 시각 포함)
+  after: z.iso.datetime({ offset: true }).optional(),
 });
 export type ListCapturesQuery = z.infer<typeof ListCapturesQuerySchema>;
 

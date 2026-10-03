@@ -5,7 +5,7 @@ import type {
 } from '@adhd-irection/shared-types';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, QueryFailedError, Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { CaptureEntity } from './capture.entity.js';
 
 // 카카오 로그인 도입 전까지 모든 캡처는 SeedTempUser 마이그레이션이 넣은 임시 유저에 귀속된다.
@@ -35,16 +35,23 @@ export class CapturesService {
     private readonly captures: Repository<CaptureEntity>,
   ) {}
 
-  async list({ limit, before }: ListCapturesQuery): Promise<Capture[]> {
-    const rows = await this.captures.find({
-      where: {
-        userId: TEMP_USER_ID,
-        ...(before && { capturedAt: LessThan(new Date(before)) }),
-      },
-      order: { capturedAt: 'DESC' },
-      take: limit,
-    });
-    return rows.map(toCapture);
+  async list({ limit, before, after }: ListCapturesQuery): Promise<Capture[]> {
+    const query = this.captures
+      .createQueryBuilder('capture')
+      .where('capture.userId = :userId', { userId: TEMP_USER_ID })
+      .orderBy('capture.capturedAt', 'DESC')
+      .take(limit);
+    if (before) {
+      query.andWhere('capture.capturedAt < :before', {
+        before: new Date(before),
+      });
+    }
+    if (after) {
+      query.andWhere('capture.capturedAt >= :after', {
+        after: new Date(after),
+      });
+    }
+    return (await query.getMany()).map(toCapture);
   }
 
   async create(input: CreateCapture): Promise<Capture> {

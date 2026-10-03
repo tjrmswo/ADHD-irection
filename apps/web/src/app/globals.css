@@ -1,26 +1,84 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* "화이트 & 그린" 디자인의 색·그림자 토큰. 라이트 테마 하나만 둔다. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-page: #f4f7f5;
+  --color-ink: #14231a;
+  --color-ink-strong: #0f2a1c;
+  --color-ink-soft: #3f4f45;
+  --color-muted: #5b6b61;
+  --color-subtle: #66756b;
+  --color-faint: #8a9a90;
+  --color-line: #e3eae5;
+  --color-hairline: #edf1ee;
+
+  --color-brand: #1b6e42;
+  --color-brand-deep: #0f4a2e;
+  --color-brand-soft: #e7f3eb;
+  --color-brand-tint: #cde7d7;
+  --color-pill: #f1f6f2;
+  --color-track: #f1f5f2;
+  --color-row: #f7faf8;
+
+  /* 출처: 커밋은 밝은 초록, 캡처는 짙은 초록 */
+  --color-commit: #3fa36a;
+  --color-capture: #0f4a2e;
+  /* 작업 블록 수의 농도 0~4 */
+  --color-level-0: #edf2ee;
+  --color-level-1: #c6e6d1;
+  --color-level-2: #86cda0;
+  --color-level-3: #3fa36a;
+  --color-level-4: #1b6e42;
+
+  --shadow-card: 0 1px 2px rgba(15, 61, 38, 0.06), 0 8px 24px rgba(15, 61, 38, 0.06);
+  --shadow-hero: 0 2px 4px rgba(15, 61, 38, 0.1), 0 12px 28px rgba(15, 74, 46, 0.22);
+  --shadow-seg: 0 1px 2px rgba(15, 61, 38, 0.06), 0 6px 18px rgba(15, 61, 38, 0.08);
+  --shadow-seg-active: 0 2px 6px rgba(27, 110, 66, 0.35);
+  --shadow-chip: 0 1px 2px rgba(15, 61, 38, 0.06), 0 4px 12px rgba(15, 61, 38, 0.05);
+  --shadow-chip-hover: 0 2px 10px rgba(15, 61, 38, 0.14);
+  --shadow-header: 0 1px 3px rgba(15, 61, 38, 0.05);
+  --shadow-logo: 0 3px 8px rgba(27, 110, 66, 0.3);
+  /* 오늘 표시: 흰 띠를 두른 짙은 테두리 */
+  --shadow-today: 0 0 0 2px #ffffff, 0 0 0 4px #0f4a2e;
+  --shadow-today-tight: 0 0 0 2px #0f4a2e;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* 스크롤바를 디자인의 초록 계열로. 가는 둥근 막대에 트랙은 비워 둔다. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-level-2) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  /* 투명 테두리로 막대를 안쪽으로 들여 6px 굵기로 보이게 한다. */
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-color: var(--color-level-2);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-level-3);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }

@@ -11,6 +11,7 @@ const BLOCK_MINUTES = 30;
 const SOURCES: { key: ActivitySource; label: string; bg: string }[] = [
   { key: "github", label: "커밋", bg: "bg-commit" },
   { key: "capture", label: "캡처", bg: "bg-capture" },
+  { key: "usage", label: "앱 사용", bg: "bg-usage" },
 ];
 
 const LEVEL_BG = [
@@ -154,7 +155,7 @@ const STRIP = {
   small: { height: "h-7", gap: "gap-0.5", radius: "rounded-[2px]" },
 };
 
-// 하루를 30분 칸 48개로 그린 띠. 한 칸에 두 출처가 있으면 위아래로 나눠 칠한다.
+// 하루를 30분 칸 48개로 그린 띠. 한 칸에 여러 출처가 있으면 위아래로 나눠 칠한다.
 export function DayStrip({
   blocks,
   size = "large",

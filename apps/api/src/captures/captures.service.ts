@@ -6,10 +6,8 @@ import type {
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
+import { TEMP_USER_ID } from '../common/temp-user.js';
 import { CaptureEntity } from './capture.entity.js';
-
-// 카카오 로그인 도입 전까지 모든 캡처는 SeedTempUser 마이그레이션이 넣은 임시 유저에 귀속된다.
-const TEMP_USER_ID = '00000000-0000-4000-8000-000000000001';
 
 const PG_FOREIGN_KEY_VIOLATION = '23503';
 

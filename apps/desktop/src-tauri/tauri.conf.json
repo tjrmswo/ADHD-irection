@@ -15,7 +15,7 @@
         "label": "main",
         "title": "캡처",
         "width": 380,
-        "height": 230,
+        "height": 340,
         "center": true,
         "resizable": false,
         "decorations": false,

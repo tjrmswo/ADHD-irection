@@ -1,5 +1,6 @@
 mod active_app;
 mod idle;
+mod usage;
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -7,10 +8,11 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Manager, State, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 const CAPTURE_WINDOW: &str = "main";
+const CAPTURE_SHOWN_EVENT: &str = "capture-shown";
 
 /// 캡처 창이 마지막으로 뜬 시각. 자동 트리거의 재발생 제한에 쓴다.
 #[derive(Default)]
@@ -70,6 +72,9 @@ fn show_capture_window(app: &AppHandle, trigger: Trigger) {
         *app.state::<LastContext>().0.lock().unwrap() = Some(context);
     }
     *app.state::<LastShown>().0.lock().unwrap() = Some(Instant::now());
+    // 웹뷰는 창이 숨겨져 있는 동안에도 살아 있으므로, 뜰 때마다 알려서 복귀 요약을 새로 불러오게 한다.
+    let context = app.state::<LastContext>().0.lock().unwrap().clone();
+    let _ = window.emit(CAPTURE_SHOWN_EVENT, context);
     let _ = window.show();
     if matches!(trigger, Trigger::Manual) {
         let _ = window.set_focus();
@@ -133,6 +138,8 @@ pub fn run() {
                     show_capture_window(app, Trigger::IdleResume);
                 }
             });
+            // 사용 흔적: 자리에 있는 동안 주기적으로 맨 앞 앱을 기록한다.
+            usage::spawn_recorder();
             Ok(())
         })
         // 창을 닫아도 앱은 계속 떠 있어야 트리거가 살아 있다 — 닫는 대신 숨긴다.

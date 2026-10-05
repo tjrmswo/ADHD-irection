@@ -3,7 +3,13 @@ import type {
   ActivityDay,
   ActivitySource,
 } from "@adhd-irection/shared-types";
+import Link from "next/link";
 import { formatDate, weekdayIndex } from "@/lib/dates";
+
+/** 그 날의 작업 기록 화면 */
+function workHref(date: string): string {
+  return `/work?date=${date}`;
+}
 
 const BLOCKS_PER_DAY = 48;
 const BLOCK_MINUTES = 30;
@@ -11,6 +17,7 @@ const BLOCK_MINUTES = 30;
 const SOURCES: { key: ActivitySource; label: string; bg: string }[] = [
   { key: "github", label: "커밋", bg: "bg-commit" },
   { key: "capture", label: "캡처", bg: "bg-capture" },
+  { key: "notion", label: "노션", bg: "bg-notion" },
   { key: "usage", label: "앱 사용", bg: "bg-usage" },
 ];
 
@@ -225,15 +232,16 @@ export function RecentWeeks({ days }: { days: ActivityDay[] }) {
             {week.map((day) => {
               const l = level(day.activeBlocks);
               return (
-                <div
+                <Link
                   key={day.date}
+                  href={workHref(day.date)}
                   title={dayTitle(day)}
-                  className={`flex aspect-square items-center justify-center rounded-[9px] text-xs font-semibold tabular-nums ${LEVEL_BG[l]} ${LEVEL_FG[l]} ${
+                  className={`flex aspect-square items-center justify-center rounded-[9px] text-xs font-semibold tabular-nums hover:opacity-80 ${LEVEL_BG[l]} ${LEVEL_FG[l]} ${
                     day.date === today ? "shadow-today" : ""
                   }`}
                 >
                   {Number(day.date.slice(8))}
-                </div>
+                </Link>
               );
             })}
           </div>
@@ -270,25 +278,33 @@ export function MonthCalendar({
       {days.map((day) => {
         const future = day.date > today;
         const l = level(day.activeBlocks);
-        return (
-          <div
-            key={day.date}
-            title={future ? formatDate(day.date) : dayTitle(day)}
-            className={`flex h-[76px] flex-col justify-between rounded-xl border px-3 py-2.5 ${
-              future
-                ? "border-dashed border-[#d3ddd6] bg-white text-faint"
-                : `border-transparent ${LEVEL_BG[l]} ${l === 0 ? "text-muted" : LEVEL_FG[l]}`
-            } ${day.date === today ? "shadow-today" : ""}`}
-          >
-            <span className="text-sm font-semibold tabular-nums">
-              {Number(day.date.slice(8))}
-            </span>
-            {!future && (
-              <span className="self-end text-xs font-semibold tabular-nums">
-                {day.activeBlocks}칸
-              </span>
-            )}
+        const className = `flex h-[76px] flex-col justify-between rounded-xl border px-3 py-2.5 ${
+          future
+            ? "border-dashed border-[#d3ddd6] bg-white text-faint"
+            : `border-transparent hover:opacity-80 ${LEVEL_BG[l]} ${l === 0 ? "text-muted" : LEVEL_FG[l]}`
+        } ${day.date === today ? "shadow-today" : ""}`;
+        const number = (
+          <span className="text-sm font-semibold tabular-nums">
+            {Number(day.date.slice(8))}
+          </span>
+        );
+        // 아직 오지 않은 날은 볼 기록이 없으니 링크로 만들지 않는다.
+        return future ? (
+          <div key={day.date} title={formatDate(day.date)} className={className}>
+            {number}
           </div>
+        ) : (
+          <Link
+            key={day.date}
+            href={workHref(day.date)}
+            title={dayTitle(day)}
+            className={className}
+          >
+            {number}
+            <span className="self-end text-xs font-semibold tabular-nums">
+              {day.activeBlocks}칸
+            </span>
+          </Link>
         );
       })}
     </div>
@@ -338,15 +354,24 @@ export function YearGrid({
             {Array.from({ length: offset }, (_, i) => (
               <div key={`pad-${i}`} />
             ))}
-            {days.map((day) => (
-              <div
-                key={day.date}
-                title={day.date > today ? formatDate(day.date) : dayTitle(day)}
-                className={`rounded-[3px] ${LEVEL_BG[level(day.activeBlocks)]} ${
-                  day.date > today ? "opacity-45" : ""
-                } ${day.date === today ? "shadow-today-tight" : ""}`}
-              />
-            ))}
+            {days.map((day) =>
+              day.date > today ? (
+                <div
+                  key={day.date}
+                  title={formatDate(day.date)}
+                  className={`rounded-[3px] opacity-45 ${LEVEL_BG[0]}`}
+                />
+              ) : (
+                <Link
+                  key={day.date}
+                  href={workHref(day.date)}
+                  title={dayTitle(day)}
+                  className={`rounded-[3px] hover:opacity-70 ${LEVEL_BG[level(day.activeBlocks)]} ${
+                    day.date === today ? "shadow-today-tight" : ""
+                  }`}
+                />
+              ),
+            )}
           </div>
         </div>
       </div>

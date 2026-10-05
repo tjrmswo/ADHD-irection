@@ -19,6 +19,24 @@ export interface GithubCommit {
 }
 
 const GRAPHQL_URL = 'https://api.github.com/graphql';
+const REST_URL = 'https://api.github.com';
+// 커밋 상세에서 보여줄 파일 수
+const MAX_FILES = 30;
+
+export interface GithubCommitDetail {
+  message: string;
+  url: string;
+  committedAt: string;
+  additions: number;
+  deletions: number;
+  fileCount: number;
+  files: {
+    path: string;
+    status: string;
+    additions: number;
+    deletions: number;
+  }[];
+}
 // 레포마다 최근에 커밋된 브랜치를 이만큼까지만 본다.
 const MAX_BRANCHES = 50;
 
@@ -160,6 +178,51 @@ export class GithubClient {
       }
     }
     return [...commits.values()];
+  }
+
+  /** 커밋 한 건의 전체 메시지와 바뀐 파일 목록. */
+  async getCommit(
+    repoFullName: string,
+    sha: string,
+  ): Promise<GithubCommitDetail> {
+    if (!this.token) throw new Error('GITHUB_TOKEN이 설정되지 않았습니다');
+    const res = await fetch(
+      `${REST_URL}/repos/${repoFullName}/commits/${sha}`,
+      {
+        headers: {
+          authorization: `Bearer ${this.token}`,
+          accept: 'application/vnd.github+json',
+          'user-agent': 'adhd-irection',
+        },
+      },
+    );
+    if (!res.ok) throw new Error(`GitHub API 호출 실패 (${res.status})`);
+    const body = (await res.json()) as {
+      html_url: string;
+      commit: { message: string; author: { date: string } };
+      stats?: { additions: number; deletions: number };
+      files?: {
+        filename: string;
+        status: string;
+        additions: number;
+        deletions: number;
+      }[];
+    };
+    const files = body.files ?? [];
+    return {
+      message: body.commit.message,
+      url: body.html_url,
+      committedAt: body.commit.author.date,
+      additions: body.stats?.additions ?? 0,
+      deletions: body.stats?.deletions ?? 0,
+      fileCount: files.length,
+      files: files.slice(0, MAX_FILES).map((file) => ({
+        path: file.filename,
+        status: file.status,
+        additions: file.additions,
+        deletions: file.deletions,
+      })),
+    };
   }
 
   private async graphql<T>(

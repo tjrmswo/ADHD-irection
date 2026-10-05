@@ -2,7 +2,6 @@ import type {
   ActivityDashboard,
   ActivityDay,
   ActivityRange,
-  RecentCommit,
 } from "@adhd-irection/shared-types";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -20,12 +19,16 @@ import {
   StatGrid,
   YearGrid,
 } from "@/components/activity";
+import { loadWorkDetail, type WorkDetail } from "@/components/work-detail";
+import {
+  parseOpenWork,
+  WorkRow,
+  type OpenWork,
+} from "@/components/work-row";
 import { fetchDashboard, fetchRange } from "@/lib/activity";
 import {
-  dateOf,
   formatDate,
   monthRange,
-  TIME_ZONE,
   today as todayDate,
   weekRange,
   yearRange,
@@ -89,79 +92,20 @@ function RangeStats({ days, today }: { days: ActivityDay[]; today: string }) {
   );
 }
 
-const clock = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: TIME_ZONE,
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-const dayAndClock = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: TIME_ZONE,
-  month: "numeric",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-function CommitRow({ commit, today }: { commit: RecentCommit; today: string }) {
-  const at = new Date(commit.committedAt);
-  // 오늘 커밋은 시각만, 다른 날 커밋은 날짜까지 보여준다.
-  const time =
-    dateOf(commit.committedAt) === today
-      ? clock.format(at)
-      : dayAndClock.format(at);
-  return (
-    <div className="-mx-3 flex items-center gap-3.5 rounded-xl p-3 hover:bg-row">
-      <span className="flex size-9 flex-none items-center justify-center rounded-[10px] bg-brand-soft">
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#1B6E42"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-        >
-          {commit.message.startsWith("Merge ") ? (
-            <>
-              <circle cx="6" cy="5" r="2" />
-              <circle cx="6" cy="19" r="2" />
-              <circle cx="18" cy="12" r="2" />
-              <path d="M6 7v10" />
-              <path d="M6 7c0 4 4 5 10 5" />
-            </>
-          ) : (
-            <>
-              <circle cx="12" cy="12" r="3.5" />
-              <path d="M2 12h6.5" />
-              <path d="M15.5 12H22" />
-            </>
-          )}
-        </svg>
-      </span>
-      <div className="flex min-w-0 flex-auto flex-col gap-[3px]">
-        <span className="truncate text-[15px] font-medium">
-          {commit.message}
-        </span>
-        <span className="truncate text-[13px] text-subtle">{commit.repo}</span>
-      </div>
-      <span className="flex-none rounded-full bg-pill px-2.5 py-1 font-mono text-[13px] text-ink-soft">
-        {time}
-      </span>
-    </div>
-  );
-}
-
-function TodayView({ dashboard }: { dashboard: ActivityDashboard }) {
-  const { days, blocks, recentCommits } = dashboard;
+function TodayView({
+  dashboard,
+  open,
+  detail,
+}: {
+  dashboard: ActivityDashboard;
+  open: OpenWork | null;
+  detail: WorkDetail | null;
+}) {
+  const { days, blocks, recentWork } = dashboard;
   const today = days[days.length - 1];
   const activeDays = days
     .slice(-7)
     .filter((day) => day.activeBlocks > 0).length;
-  const repos = new Set(recentCommits.map((commit) => commit.repo));
 
   return (
     <>
@@ -217,22 +161,23 @@ function TodayView({ dashboard }: { dashboard: ActivityDashboard }) {
         </Card>
 
         <Card className="min-w-0 flex-[999_1_520px] gap-2">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <CardTitle>최근 커밋</CardTitle>
-            {repos.size === 1 && (
-              <span className="truncate text-[13px] text-subtle">
-                {recentCommits[0].repo}
-              </span>
-            )}
+          <div className="mb-2 flex items-baseline justify-between gap-3">
+            <CardTitle>최근 작업</CardTitle>
+            <Link href="/work" className="text-[13px] font-medium text-brand">
+              전체 작업 기록 보기 →
+            </Link>
           </div>
-          {recentCommits.length === 0 ? (
-            <p className="text-sm text-subtle">아직 가져온 커밋이 없습니다.</p>
+          {recentWork.length === 0 ? (
+            <p className="text-sm text-subtle">아직 가져온 작업이 없습니다.</p>
           ) : (
-            recentCommits.map((commit) => (
-              <CommitRow
-                key={`${commit.repo}-${commit.committedAt}`}
-                commit={commit}
+            recentWork.map((work) => (
+              <WorkRow
+                key={`${work.kind}-${work.ref}-${work.at}`}
+                work={work}
                 today={dashboard.date}
+                open={open}
+                detail={detail}
+                path="/"
               />
             ))
           )}
@@ -264,7 +209,14 @@ function WeekView({ range, today }: { range: ActivityRange; today: string }) {
                   day.date === today ? "bg-[#f1f8f3]" : ""
                 } ${day.date > today ? "opacity-45" : ""}`}
               >
-                <div className="flex w-[92px] flex-none items-center gap-2">
+                {/* 요일을 누르면 그 날의 작업 기록으로 간다 (오지 않은 날은 제외). */}
+                <Link
+                  href={day.date > today ? "/work" : `/work?date=${day.date}`}
+                  aria-disabled={day.date > today}
+                  className={`flex w-[92px] flex-none items-center gap-2 ${
+                    day.date > today ? "pointer-events-none" : "hover:underline"
+                  }`}
+                >
                   <span
                     className={`text-sm ${day.date === today ? "font-bold" : "font-medium"}`}
                   >
@@ -273,7 +225,7 @@ function WeekView({ range, today }: { range: ActivityRange; today: string }) {
                   <span className="font-mono text-[13px] text-muted">
                     {formatDate(day.date, "short")}
                   </span>
-                </div>
+                </Link>
                 <div className="min-w-0 flex-auto">
                   <DayStrip
                     size="medium"
@@ -447,7 +399,9 @@ function periodLabel(view: View, today: string, range?: ActivityRange) {
 }
 
 export default async function ActivityPage({ searchParams }: PageProps<"/">) {
-  const { view: viewParam } = await searchParams;
+  const params = await searchParams;
+  const viewParam = params.view;
+  const open = parseOpenWork(params);
   const view: View =
     VIEWS.find((candidate) => candidate.key === viewParam)?.key ?? "today";
   const today = todayDate();
@@ -456,9 +410,16 @@ export default async function ActivityPage({ searchParams }: PageProps<"/">) {
   let dashboard: ActivityDashboard | undefined;
   let range: ActivityRange | undefined;
   let failure: string | undefined;
+  let detail: WorkDetail | null = null;
   try {
     if (view === "today") {
-      dashboard = await fetchDashboard();
+      // 펼쳐 둔 줄이 있으면 그 상세를 함께 가져온다. 상세만 실패해도 화면은 그린다.
+      const [loaded, loadedDetail] = await Promise.all([
+        fetchDashboard(),
+        open ? loadWorkDetail(open) : null,
+      ]);
+      dashboard = loaded;
+      detail = loadedDetail;
     } else {
       const { from, to } = RANGES[view](today);
       range = await fetchRange(from, to);
@@ -469,7 +430,7 @@ export default async function ActivityPage({ searchParams }: PageProps<"/">) {
 
   let content: React.ReactNode;
   if (dashboard) {
-    content = <TodayView dashboard={dashboard} />;
+    content = <TodayView dashboard={dashboard} open={open} detail={detail} />;
   } else if (range) {
     const RangeView = RANGE_VIEWS[view as keyof typeof RANGE_VIEWS];
     content = <RangeView range={range} today={today} />;

@@ -51,6 +51,7 @@ export function Recap({
   const counts = [
     recap.commits > 0 && `커밋 ${recap.commits}개`,
     recap.captures > 0 && `캡처 ${recap.captures}개`,
+    recap.notionEdits > 0 && `노션 편집 ${recap.notionEdits}번`,
   ].filter(Boolean);
 
   return (
@@ -70,6 +71,12 @@ export function Recap({
         <p className="recap-line" title={recap.lastCommit.message}>
           <span>마지막 커밋</span>
           {recap.lastCommit.message}
+        </p>
+      )}
+      {recap.lastNotionPage && (
+        <p className="recap-line" title={recap.lastNotionPage}>
+          <span>노션</span>
+          {recap.lastNotionPage}
         </p>
       )}
       {recap.lastContext && (

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/", label: "작업 흔적" },
+  { href: "/work", label: "작업 기록" },
   { href: "/captures", label: "캡처 기록" },
 ];
 

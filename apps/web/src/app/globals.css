@@ -23,10 +23,12 @@
   --color-track: #f1f5f2;
   --color-row: #f7faf8;
 
-  /* 출처: 커밋은 밝은 초록, 캡처는 짙은 초록, 앱 사용은 연한 초록 */
+  /* 출처: 커밋은 밝은 초록, 캡처는 짙은 초록, 앱 사용은 연한 초록, Notion은 청록 */
   --color-commit: #3fa36a;
   --color-capture: #0f4a2e;
   --color-usage: #a9dabb;
+  /* Notion 편집은 초록 계열과 구분되도록 캡처 기록의 "전환함"과 같은 청록을 쓴다. */
+  --color-notion: #3a9aaa;
   /* 작업 블록 수의 농도 0~4 */
   --color-level-0: #edf2ee;
   --color-level-1: #c6e6d1;

@@ -7,6 +7,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { TEMP_USER_ID } from '../common/temp-user.js';
+import { visibleTitle } from '../usage/visibility.js';
 import { CaptureEntity } from './capture.entity.js';
 
 const PG_FOREIGN_KEY_VIOLATION = '23503';
@@ -22,7 +23,8 @@ function toCapture(entity: CaptureEntity): Capture {
     capturedAt: entity.capturedAt.toISOString(),
     triggerType: entity.triggerType,
     activeApp: entity.activeApp,
-    windowTitle: entity.windowTitle,
+    // 저장은 그대로 하고, 내보낼 때만 가린다.
+    windowTitle: visibleTitle(entity.activeApp, entity.windowTitle),
   };
 }
 

@@ -104,7 +104,12 @@ export default async function CapturesPage({
               ‹
             </Link>
           )}
-          <DatePicker value={from} max={today} active={picked !== null} />
+          <DatePicker
+            value={from}
+            max={today}
+            active={picked !== null}
+            basePath="/captures"
+          />
           {singleDay && next <= today && (
             <Link
               href={`/captures?date=${next}`}

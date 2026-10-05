@@ -52,6 +52,11 @@ export function monthRange(date: string): { from: string; to: string } {
   return { from: `${prefix}01`, to: `${prefix}${lastDay}` };
 }
 
+/** "YYYY-MM"이 실제 달인지 */
+export function isMonth(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+}
+
 export function yearRange(date: string): { from: string; to: string } {
   const year = date.slice(0, 4);
   return { from: `${year}-01-01`, to: `${year}-12-31` };

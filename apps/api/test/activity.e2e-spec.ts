@@ -14,6 +14,8 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
 import { AppModule } from './../src/app.module.js';
+import { AuthGuard } from './../src/auth/auth.guard.js';
+import { allowAll } from './allow-all.js';
 import { GithubClient } from './../src/github/github.client.js';
 import { NotionClient } from './../src/notion/notion.client.js';
 
@@ -81,6 +83,8 @@ describe('활동 대시보드와 GitHub 동기화 (e2e)', () => {
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     })
+      .overrideProvider(AuthGuard)
+      .useValue(allowAll)
       .overrideProvider(GithubClient)
       .useValue(fakeGithub)
       .overrideProvider(NotionClient)

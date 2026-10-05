@@ -1,6 +1,8 @@
 import type { GithubSyncStatus } from "@adhd-irection/shared-types";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { fetchSyncStatus } from "@/lib/activity";
+import { SESSION_COOKIE } from "@/lib/session";
 import { TIME_ZONE } from "@/lib/dates";
 import { SiteNav } from "./site-nav";
 
@@ -33,7 +35,11 @@ function syncPill(status: GithubSyncStatus | null): {
 }
 
 export async function SiteHeader() {
-  const pill = syncPill(await fetchSyncStatus().catch(() => null));
+  // 로그인 전(로그인 화면)에는 로고만 보여준다.
+  const loggedIn = (await cookies()).has(SESSION_COOKIE);
+  const pill = loggedIn
+    ? syncPill(await fetchSyncStatus().catch(() => null))
+    : null;
   return (
     <header className="border-b border-line bg-white shadow-header">
       <div className="mx-auto flex min-h-[72px] max-w-[1120px] flex-wrap items-stretch gap-x-10 px-6">
@@ -57,13 +63,25 @@ export async function SiteHeader() {
             ADHD-irection
           </span>
         </Link>
-        <SiteNav />
-        <div className="flex items-center py-3">
-          <span className="inline-flex items-center gap-2 rounded-full bg-pill px-3.5 py-2 text-[13px] text-ink-soft">
-            <span className={`size-2 rounded-full ${pill.dot}`} />
-            {pill.label}
-          </span>
-        </div>
+        {pill && (
+          <>
+            <SiteNav />
+            <div className="flex items-center gap-2 py-3">
+              <span className="inline-flex items-center gap-2 rounded-full bg-pill px-3.5 py-2 text-[13px] text-ink-soft">
+                <span className={`size-2 rounded-full ${pill.dot}`} />
+                {pill.label}
+              </span>
+              <form action="/auth/logout" method="post">
+                <button
+                  type="submit"
+                  className="min-h-9 cursor-pointer rounded-full px-3 text-[13px] font-medium text-muted hover:bg-pill hover:text-ink-strong"
+                >
+                  로그아웃
+                </button>
+              </form>
+            </div>
+          </>
+        )}
       </div>
     </header>
   );

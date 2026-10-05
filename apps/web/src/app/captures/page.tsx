@@ -1,6 +1,7 @@
 import type { Capture } from "@adhd-irection/shared-types";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
 import { CaptureList } from "@/components/capture-list";
 import { DatePicker } from "@/components/date-picker";
 import { fetchCaptures } from "@/lib/captures";
@@ -57,6 +58,8 @@ export default async function CapturesPage({
       before: startOfDay(addDays(to, 1)),
     });
   } catch (error) {
+    // 로그인 화면으로 보내는 redirect는 그대로 통과시킨다.
+    unstable_rethrow(error);
     failure = error instanceof Error ? error.message : String(error);
   }
 

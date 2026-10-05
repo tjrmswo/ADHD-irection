@@ -2,6 +2,7 @@ import type {
   CommitDetail,
   NotionPageDetail,
 } from "@adhd-irection/shared-types";
+import { unstable_rethrow } from "next/navigation";
 import { fetchCommitDetail, fetchNotionPage } from "@/lib/activity";
 
 // 최근 작업에서 고른 줄의 상세. 조회에 실패하면 error만 채워진다.
@@ -194,6 +195,8 @@ export async function loadWorkDetail(open: {
       ? { kind: "commit", commit: await fetchCommitDetail(open.ref) }
       : { kind: "notion", page: await fetchNotionPage(open.ref) };
   } catch (error) {
+    // 로그인 화면으로 보내는 redirect는 그대로 통과시킨다.
+    unstable_rethrow(error);
     return {
       kind: "error",
       message: error instanceof Error ? error.message : String(error),

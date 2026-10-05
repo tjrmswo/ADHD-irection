@@ -5,6 +5,8 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
 import { AppModule } from './../src/app.module.js';
+import { AuthGuard } from './../src/auth/auth.guard.js';
+import { allowAll } from './allow-all.js';
 
 // 로컬 Postgres(pnpm db:up + pnpm db:migrate)가 떠 있어야 한다.
 describe('POST /captures (e2e)', () => {
@@ -22,7 +24,10 @@ describe('POST /captures (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(AuthGuard)
+      .useValue(allowAll)
+      .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
   });
@@ -168,7 +173,10 @@ describe('GET /captures (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(AuthGuard)
+      .useValue(allowAll)
+      .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
 

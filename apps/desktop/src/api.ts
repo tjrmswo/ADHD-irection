@@ -10,6 +10,8 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+// API가 요구하는 키 (apps/desktop/.env의 VITE_API_KEY, API의 DESKTOP_API_KEY와 같은 값)
+const API_KEY = import.meta.env.VITE_API_KEY ?? "";
 
 // 캡처 창이 뜬 순간 Rust 쪽이 기록해 둔 맥락 (계기, 직전에 쓰던 앱).
 export type CaptureContext = Pick<
@@ -30,7 +32,7 @@ export async function createTagCapture(tag: PresetTag): Promise<Capture> {
 
   const res = await fetch(`${API_URL}/captures`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-api-key": API_KEY },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`캡처 저장 실패 (${res.status})`);
@@ -39,7 +41,9 @@ export async function createTagCapture(tag: PresetTag): Promise<Capture> {
 
 // 직전에 이어서 작업한 구간의 요약. 최근 흔적이 없으면 null.
 export async function fetchRecap(): Promise<ActivityRecap | null> {
-  const res = await fetch(`${API_URL}/activity/recap`);
+  const res = await fetch(`${API_URL}/activity/recap`, {
+    headers: { "x-api-key": API_KEY },
+  });
   if (!res.ok) throw new Error(`복귀 요약 조회 실패 (${res.status})`);
   return ActivityRecapResponseSchema.parse(await res.json()).recap;
 }

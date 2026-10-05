@@ -5,6 +5,7 @@ import type {
 } from "@adhd-irection/shared-types";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
 import {
   Card,
   CardTitle,
@@ -425,6 +426,8 @@ export default async function ActivityPage({ searchParams }: PageProps<"/">) {
       range = await fetchRange(from, to);
     }
   } catch (error) {
+    // 로그인 화면으로 보내는 redirect는 그대로 통과시킨다.
+    unstable_rethrow(error);
     failure = error instanceof Error ? error.message : String(error);
   }
 

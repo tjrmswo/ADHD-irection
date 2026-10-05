@@ -97,6 +97,30 @@ describe('POST /captures (e2e)', () => {
     ]);
   });
 
+  it('브라우저처럼 개인적인 내용이 담길 수 있는 앱의 창 제목은 저장만 하고 내보내지 않는다', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/captures')
+      .send({
+        ...validBody,
+        triggerType: 'manual',
+        activeApp: 'Google Chrome',
+        windowTitle: '개인적인 탭 제목',
+      })
+      .expect(201);
+    createdIds.push(res.body.id);
+
+    // 응답에서는 앱 이름만 남고 창 제목은 가려진다.
+    expect(CaptureSchema.parse(res.body)).toMatchObject({
+      activeApp: 'Google Chrome',
+      windowTitle: null,
+    });
+    // DB에는 그대로 저장돼 있다.
+    const rows = await app
+      .get(DataSource)
+      .query('SELECT window_title FROM captures WHERE id = $1', [res.body.id]);
+    expect(rows).toEqual([{ window_title: '개인적인 탭 제목' }]);
+  });
+
   it('알 수 없는 triggerType은 400으로 거부한다', async () => {
     const res = await request(app.getHttpServer())
       .post('/captures')

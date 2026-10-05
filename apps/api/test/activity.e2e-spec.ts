@@ -1,5 +1,9 @@
 import {
   ActivityDashboardSchema,
+  CommitDetailSchema,
+  NotionPageDetailSchema,
+  WorkItemsSchema,
+  WorkLogSchema,
   ActivityRangeSchema,
   ActivityRecapResponseSchema,
   GithubSyncResultSchema,
@@ -11,6 +15,7 @@ import { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
 import { AppModule } from './../src/app.module.js';
 import { GithubClient } from './../src/github/github.client.js';
+import { NotionClient } from './../src/notion/notion.client.js';
 
 const TEMP_USER_ID = '00000000-0000-4000-8000-000000000001';
 
@@ -37,6 +42,34 @@ const fakeGithub = {
           },
         ]
       : [],
+  getCommit: async (repoFullName: string, sha: string) => ({
+    message: `전체 메시지 (${repoFullName})\n\n본문`,
+    url: `https://github.com/${repoFullName}/commit/${sha}`,
+    committedAt: '2001-03-10T00:20:00Z',
+    additions: 12,
+    deletions: 3,
+    fileCount: 1,
+    files: [
+      { path: 'src/main.ts', status: 'modified', additions: 12, deletions: 3 },
+    ],
+  }),
+};
+
+// 실제 Notion을 부르지 않도록 바꿔 끼우는 가짜 클라이언트. 테스트가 돌려줄 페이지를 바꿔 가며 쓴다.
+const fakeNotion = {
+  enabled: true,
+  pages: [] as { id: string; title: string | null; lastEditedAt: string }[],
+  listRecentlyEditedPages: async () => fakeNotion.pages,
+  getPageContent: async () => ({
+    title: '정리 노트',
+    url: 'https://www.notion.so/e2e',
+    lastEditedAt: '2001-03-14T01:10:00Z',
+    blocks: [
+      { type: 'heading_1', text: '오늘 한 일', checked: null },
+      { type: 'to_do', text: '모듈 구조 정리', checked: true },
+    ],
+    truncated: false,
+  }),
 };
 
 // 로컬 Postgres(pnpm db:up + pnpm db:migrate)가 떠 있어야 한다.
@@ -50,6 +83,8 @@ describe('활동 대시보드와 GitHub 동기화 (e2e)', () => {
     })
       .overrideProvider(GithubClient)
       .useValue(fakeGithub)
+      .overrideProvider(NotionClient)
+      .useValue(fakeNotion)
       .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
@@ -87,6 +122,9 @@ describe('활동 대시보드와 GitHub 동기화 (e2e)', () => {
 
   afterAll(async () => {
     await clearUsage();
+    await dataSource.query(
+      `DELETE FROM notion_events WHERE page_id LIKE 'e2e-%'`,
+    );
     // github_events는 repos 삭제 시 CASCADE로 함께 지워진다.
     await dataSource.query(
       `DELETE FROM repos WHERE github_full_name LIKE 'e2e-test/%'`,
@@ -140,23 +178,42 @@ describe('활동 대시보드와 GitHub 동기화 (e2e)', () => {
     expect(days[0].activeBlocks).toBe(0);
   });
 
-  it('기준일까지의 최근 커밋을 최신순으로 돌려준다', async () => {
+  it('기준일까지의 최근 커밋과 Notion 편집을 한 목록으로 최신순으로 돌려준다', async () => {
+    // 두 커밋(09:10, 09:20 KST) 사이에 Notion 편집 하나
+    await dataSource.query(
+      `INSERT INTO notion_events (page_id, page_title, edited_at)
+       VALUES ('e2e-recent', '아침 정리', '2001-03-10T00:15:00Z')`,
+    );
     const res = await request(app.getHttpServer())
       .get('/activity/dashboard')
       .query({ date: '2001-03-10' })
       .expect(200);
-    const { recentCommits } = ActivityDashboardSchema.parse(res.body);
+    const { recentWork } = ActivityDashboardSchema.parse(res.body);
+    await dataSource.query(
+      `DELETE FROM notion_events WHERE page_id = 'e2e-recent'`,
+    );
 
-    expect(recentCommits.slice(0, 2)).toEqual([
+    expect(recentWork.slice(0, 3)).toEqual([
       {
-        repo: 'e2e-test/dashboard',
-        message: '아침 커밋 2',
-        committedAt: '2001-03-10T00:20:00.000Z',
+        kind: 'commit',
+        title: '아침 커밋 2',
+        detail: 'e2e-test/dashboard',
+        at: '2001-03-10T00:20:00.000Z',
+        ref: 's4',
       },
       {
-        repo: 'e2e-test/dashboard',
-        message: '아침 커밋 1',
-        committedAt: '2001-03-10T00:10:00.000Z',
+        kind: 'notion',
+        title: '아침 정리',
+        detail: null,
+        at: '2001-03-10T00:15:00.000Z',
+        ref: 'e2e-recent',
+      },
+      {
+        kind: 'commit',
+        title: '아침 커밋 1',
+        detail: 'e2e-test/dashboard',
+        at: '2001-03-10T00:10:00.000Z',
+        ref: 's3',
       },
     ]);
   });
@@ -225,6 +282,8 @@ describe('활동 대시보드와 GitHub 동기화 (e2e)', () => {
       endedAt: '2001-03-10T00:25:00.000Z',
       commits: 2,
       captures: 1,
+      notionEdits: 0,
+      lastNotionPage: null,
       lastCommit: {
         repo: 'e2e-test/dashboard',
         message: '아침 커밋 2',
@@ -245,6 +304,8 @@ describe('활동 대시보드와 GitHub 동기화 (e2e)', () => {
       endedAt: '2001-03-10T03:05:00.000Z',
       commits: 0,
       captures: 1,
+      notionEdits: 0,
+      lastNotionPage: null,
       lastCommit: null,
       lastContext: null,
     });
@@ -289,8 +350,11 @@ describe('활동 대시보드와 GitHub 동기화 (e2e)', () => {
       endedAt: '2001-03-12T01:10:00.000Z',
       commits: 0,
       captures: 0,
+      notionEdits: 0,
+      lastNotionPage: null,
       lastCommit: null,
-      lastContext: { activeApp: 'Google Chrome', windowTitle: 'NestJS 문서' },
+      // 브라우저는 창 제목을 저장만 하고 내보내지 않는다.
+      lastContext: { activeApp: 'Google Chrome', windowTitle: null },
     });
   });
 
@@ -313,6 +377,206 @@ describe('활동 대시보드와 GitHub 동기화 (e2e)', () => {
       .post('/usage')
       .send({ activeApp: '', observedAt: '2001-03-12T01:00:00Z' })
       .expect(400);
+  });
+
+  it('Notion 페이지의 편집 시각이 바뀔 때만 편집으로 저장한다', async () => {
+    const sync = () =>
+      request(app.getHttpServer()).post('/notion/sync').expect(200);
+
+    // 한국 시간 2001-03-14 10:00에 편집된 페이지
+    fakeNotion.pages = [
+      {
+        id: 'e2e-page',
+        title: '정리 노트',
+        lastEditedAt: '2001-03-14T01:00:00Z',
+      },
+    ];
+    expect((await sync()).body).toEqual({ inserted: 1 });
+    // 그 사이 편집이 없으면 같은 시각이 다시 오고, 저장하지 않는다.
+    expect((await sync()).body).toEqual({ inserted: 0 });
+    // 다시 편집되면 시각이 바뀐다.
+    fakeNotion.pages = [
+      {
+        id: 'e2e-page',
+        title: '정리 노트 v2',
+        lastEditedAt: '2001-03-14T01:10:00Z',
+      },
+    ];
+    expect((await sync()).body).toEqual({ inserted: 1 });
+
+    const range = await request(app.getHttpServer())
+      .get('/activity/range')
+      .query({ from: '2001-03-14', to: '2001-03-14' })
+      .expect(200);
+    expect(ActivityRangeSchema.parse(range.body).blocks).toEqual([
+      { date: '2001-03-14', index: 20, sources: ['notion'] },
+    ]);
+
+    const res = await request(app.getHttpServer())
+      .get('/activity/recap')
+      .query({ at: '2001-03-14T02:00:00Z' })
+      .expect(200);
+    expect(ActivityRecapResponseSchema.parse(res.body).recap).toMatchObject({
+      startedAt: '2001-03-14T01:00:00.000Z',
+      endedAt: '2001-03-14T01:10:00.000Z',
+      notionEdits: 2,
+      lastNotionPage: '정리 노트 v2',
+    });
+
+    const status = await request(app.getHttpServer())
+      .get('/notion/sync')
+      .expect(200);
+    expect(status.body).toMatchObject({ enabled: true, lastError: null });
+  });
+
+  it('저장된 커밋의 상세를 돌려주고, 저장되지 않은 커밋은 404다', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/github/commits/s4')
+      .expect(200);
+    expect(CommitDetailSchema.parse(res.body)).toMatchObject({
+      repo: 'e2e-test/dashboard',
+      sha: 's4',
+      message: '전체 메시지 (e2e-test/dashboard)\n\n본문',
+      additions: 12,
+      deletions: 3,
+      files: [{ path: 'src/main.ts', status: 'modified' }],
+    });
+
+    await request(app.getHttpServer())
+      .get('/github/commits/not-stored')
+      .expect(404);
+  });
+
+  it('편집이 저장된 Notion 페이지의 내용을 돌려주고, 그렇지 않은 페이지는 404다', async () => {
+    await dataSource.query(
+      `INSERT INTO notion_events (page_id, page_title, edited_at)
+       VALUES ('e2e-detail', '정리 노트', '2001-03-15T01:00:00Z')`,
+    );
+    const res = await request(app.getHttpServer())
+      .get('/notion/pages/e2e-detail')
+      .expect(200);
+    expect(NotionPageDetailSchema.parse(res.body)).toMatchObject({
+      pageId: 'e2e-detail',
+      title: '정리 노트',
+      blocks: [
+        { type: 'heading_1', text: '오늘 한 일', checked: null },
+        { type: 'to_do', text: '모듈 구조 정리', checked: true },
+      ],
+      truncated: false,
+    });
+
+    await request(app.getHttpServer())
+      .get('/notion/pages/not-stored')
+      .expect(404);
+  });
+
+  it('기간의 흔적을 작업 구간으로 묶고 가장 많이 한 것을 센다', async () => {
+    // 2001-03-10 KST: 00:10 커밋 / (30분 넘는 간격) / 09:10·09:20 커밋 + 09:25 캡처 / 12:05 캡처
+    const res = await request(app.getHttpServer())
+      .get('/activity/log')
+      .query({ from: '2001-03-10', to: '2001-03-10' })
+      .expect(200);
+    const log = WorkLogSchema.parse(res.body);
+
+    expect(
+      log.sessions.map((session) => [
+        session.startedAt,
+        session.endedAt,
+        session.commits,
+        session.captures,
+      ]),
+    ).toEqual([
+      ['2001-03-10T03:05:00.000Z', '2001-03-10T03:05:00.000Z', 0, 1],
+      ['2001-03-10T00:10:00.000Z', '2001-03-10T00:25:00.000Z', 2, 1],
+      ['2001-03-09T15:10:00.000Z', '2001-03-09T15:10:00.000Z', 1, 0],
+    ]);
+    expect(log.sessions.every((s) => s.date === '2001-03-10')).toBe(true);
+    expect(log.top.repos).toEqual([{ name: 'e2e-test/dashboard', count: 3 }]);
+  });
+
+  it('구간마다 쓴 앱과 주로 본 화면을 사용 시간순으로 돌려준다', async () => {
+    await clearUsage();
+    const rows = [
+      ['Code', 'main.ts', '2001-03-16T01:00:00Z'],
+      ['Code', 'main.ts', '2001-03-16T01:01:00Z'],
+      ['Code', 'app.module.ts', '2001-03-16T01:02:00Z'],
+      ['Notion', '정리 노트', '2001-03-16T01:03:00Z'],
+      ['Google Chrome', '개인적인 탭 제목', '2001-03-16T01:04:00Z'],
+      ['Google Chrome', '개인적인 탭 제목', '2001-03-16T01:05:00Z'],
+      ['Google Chrome', '개인적인 탭 제목', '2001-03-16T01:06:00Z'],
+      ['Google Chrome', '(1) 어떤 영상 - YouTube', '2001-03-16T01:07:00Z'],
+      ['Google Chrome', '다른 영상 - YouTube', '2001-03-16T01:08:00Z'],
+    ];
+    for (const [activeApp, windowTitle, observedAt] of rows) {
+      await request(app.getHttpServer())
+        .post('/usage')
+        .send({ activeApp, windowTitle, observedAt })
+        .expect(201);
+    }
+    const res = await request(app.getHttpServer())
+      .get('/activity/log')
+      .query({ from: '2001-03-16', to: '2001-03-16' })
+      .expect(200);
+    const log = WorkLogSchema.parse(res.body);
+
+    expect(log.sessions).toHaveLength(1);
+    // 앱 이름과 시간은 브라우저도 나온다.
+    expect(log.sessions[0]).toMatchObject({
+      usageMinutes: 9,
+      apps: [
+        { name: 'Google Chrome', minutes: 5 },
+        { name: 'Code', minutes: 3 },
+        { name: 'Notion', minutes: 1 },
+      ],
+    });
+    // 작업 도구는 창 제목 그대로, 브라우저는 탭 제목 대신 사이트 이름으로 묶여 나온다.
+    // 이름을 모르는 사이트는 "기타 사이트"로 묶이고 맨 뒤에 온다.
+    expect(log.sessions[0].screens).toEqual([
+      { app: 'Code', title: 'main.ts', minutes: 2, distraction: false },
+      { app: 'Google Chrome', title: 'YouTube', minutes: 2, distraction: true },
+      { app: 'Code', title: 'app.module.ts', minutes: 1, distraction: false },
+      { app: 'Notion', title: '정리 노트', minutes: 1, distraction: false },
+      {
+        app: 'Google Chrome',
+        title: '기타 사이트',
+        minutes: 3,
+        distraction: false,
+      },
+    ]);
+    expect(log.top.apps).toEqual([
+      { name: 'Google Chrome', minutes: 5 },
+      { name: 'Code', minutes: 3 },
+      { name: 'Notion', minutes: 1 },
+    ]);
+    expect(log.top.sites).toEqual([
+      { name: '기타 사이트', minutes: 3, distraction: false },
+      { name: 'YouTube', minutes: 2, distraction: true },
+    ]);
+    // 어디에도 탭 제목은 나오지 않는다.
+    expect(JSON.stringify(res.body)).not.toContain('어떤 영상');
+    expect(JSON.stringify(res.body)).not.toContain('개인적인 탭 제목');
+    // 가려도 DB에는 그대로 남아 있다.
+    const [{ count }] = await dataSource.query(
+      `SELECT count(*)::int AS count FROM app_usage
+       WHERE window_title = '개인적인 탭 제목'`,
+    );
+    expect(count).toBe(3);
+  });
+
+  it('하루의 개별 작업에는 커밋·Notion 편집과 함께 캡처도 들어간다', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/activity/log/items')
+      .query({ date: '2001-03-10' })
+      .expect(200);
+    const { items } = WorkItemsSchema.parse(res.body);
+
+    expect(items.map((item) => [item.kind, item.title, item.detail])).toEqual([
+      ['capture', 'break', null],
+      ['capture', 'blocked', 'Code — main.ts'],
+      ['commit', '아침 커밋 2', 'e2e-test/dashboard'],
+      ['commit', '아침 커밋 1', 'e2e-test/dashboard'],
+      ['commit', '자정 직후 커밋', 'e2e-test/dashboard'],
+    ]);
   });
 
   it('동기화하면 커밋을 저장하고, 다시 해도 중복 저장하지 않는다', async () => {

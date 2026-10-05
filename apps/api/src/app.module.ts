@@ -7,6 +7,7 @@ import { CapturesModule } from './captures/captures.module.js';
 import { dataSourceOptions } from './database/data-source.js';
 import { GithubModule } from './github/github.module.js';
 import { HealthController } from './health.controller.js';
+import { NotionModule } from './notion/notion.module.js';
 import { UsageModule } from './usage/usage.module.js';
 
 @Module({
@@ -14,6 +15,7 @@ import { UsageModule } from './usage/usage.module.js';
     TypeOrmModule.forRoot({ ...dataSourceOptions, autoLoadEntities: true }),
     CapturesModule,
     GithubModule,
+    NotionModule,
     ActivityModule,
     UsageModule,
   ],

@@ -2,15 +2,18 @@
 
 import { useRouter } from "next/navigation";
 
-// 날짜를 고르면 그 날의 캡처 기록으로 이동한다.
+// 날짜를 고르면 그 날의 기록으로 이동한다.
 export function DatePicker({
   value,
   max,
   active,
+  basePath,
 }: {
   value: string;
   max: string;
   active: boolean;
+  // 날짜를 고르면 `${basePath}?date=…`로 이동한다
+  basePath: string;
 }) {
   const router = useRouter();
   return (
@@ -26,7 +29,7 @@ export function DatePicker({
         max={max}
         onChange={(event) => {
           if (event.target.value) {
-            router.push(`/captures?date=${event.target.value}`);
+            router.push(`${basePath}?date=${event.target.value}`);
           }
         }}
         className={`cursor-pointer bg-transparent font-mono text-[13px] outline-none ${

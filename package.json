@@ -12,7 +12,7 @@
     "dev:api": "pnpm --filter @adhd-irection/api start:dev",
     "dev:web": "pnpm --filter @adhd-irection/web dev",
     "dev:desktop": "pnpm --filter @adhd-irection/desktop tauri dev",
-    "dev:desktop:idle10": "ADHD_IDLE_THRESHOLD_SECS=10 pnpm dev:desktop",
+    "dev:desktop:idle10": "ADHD_IDLE_THRESHOLD_SECS=10 ADHD_USAGE_INTERVAL_SECS=10 pnpm dev:desktop",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",

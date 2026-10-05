@@ -55,7 +55,7 @@ impl ResumeDetector {
     }
 }
 
-fn duration_from_env(name: &str, default: Duration) -> Duration {
+pub(crate) fn duration_from_env(name: &str, default: Duration) -> Duration {
     std::env::var(name)
         .ok()
         .and_then(|value| value.parse().ok())

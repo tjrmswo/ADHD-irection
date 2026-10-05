@@ -1,6 +1,7 @@
 import {
   ActivityDashboardSchema,
   ActivityRangeSchema,
+  ActivityRecapResponseSchema,
   GithubSyncResultSchema,
 } from '@adhd-irection/shared-types';
 import { INestApplication } from '@nestjs/common';
@@ -69,15 +70,23 @@ describe('활동 대시보드와 GitHub 동기화 (e2e)', () => {
       [repoId],
     );
     await dataSource.query(
-      `INSERT INTO captures (user_id, type, content, source, captured_at, trigger_type)
+      `INSERT INTO captures
+         (user_id, type, content, source, captured_at, trigger_type, active_app, window_title)
        VALUES
-         ($1, 'tag', 'blocked', 'desktop', '2001-03-10T00:25:00Z', 'idle_resume'),
-         ($1, 'tag', 'break',   'desktop', '2001-03-10T03:05:00Z', 'manual')`,
+         ($1, 'tag', 'blocked', 'desktop', '2001-03-10T00:25:00Z', 'idle_resume', 'Code', 'main.ts'),
+         ($1, 'tag', 'break',   'desktop', '2001-03-10T03:05:00Z', 'manual', NULL, NULL)`,
       [TEMP_USER_ID],
     );
   });
 
+  // 사용 흔적 테스트가 넣은 것 (2001-03-12 KST 전후)
+  const clearUsage = () =>
+    dataSource.query(
+      `DELETE FROM app_usage WHERE observed_at >= '2001-03-01' AND observed_at < '2001-04-01'`,
+    );
+
   afterAll(async () => {
+    await clearUsage();
     // github_events는 repos 삭제 시 CASCADE로 함께 지워진다.
     await dataSource.query(
       `DELETE FROM repos WHERE github_full_name LIKE 'e2e-test/%'`,
@@ -203,7 +212,115 @@ describe('활동 대시보드와 GitHub 동기화 (e2e)', () => {
       .expect(200);
   });
 
+  it('직전에 이어서 작업한 구간을 요약한다', async () => {
+    // 09:10, 09:20 커밋과 09:25 캡처가 한 구간. 그 앞의 00:10 커밋은 30분 넘게 떨어져 있다.
+    const res = await request(app.getHttpServer())
+      .get('/activity/recap')
+      .query({ at: '2001-03-10T01:00:00Z' })
+      .expect(200);
+    const { recap } = ActivityRecapResponseSchema.parse(res.body);
+
+    expect(recap).toEqual({
+      startedAt: '2001-03-10T00:10:00.000Z',
+      endedAt: '2001-03-10T00:25:00.000Z',
+      commits: 2,
+      captures: 1,
+      lastCommit: {
+        repo: 'e2e-test/dashboard',
+        message: '아침 커밋 2',
+        committedAt: '2001-03-10T00:20:00.000Z',
+      },
+      lastContext: { activeApp: 'Code', windowTitle: 'main.ts' },
+    });
+  });
+
+  it('구간에 커밋이나 앱 정보가 없으면 그 항목은 null이다', async () => {
+    // 12:05 캡처 하나뿐인 구간 (앱 정보 없음)
+    const res = await request(app.getHttpServer())
+      .get('/activity/recap')
+      .query({ at: '2001-03-10T04:00:00Z' })
+      .expect(200);
+    expect(ActivityRecapResponseSchema.parse(res.body).recap).toEqual({
+      startedAt: '2001-03-10T03:05:00.000Z',
+      endedAt: '2001-03-10T03:05:00.000Z',
+      commits: 0,
+      captures: 1,
+      lastCommit: null,
+      lastContext: null,
+    });
+  });
+
+  it('최근 12시간 안에 흔적이 없으면 요약은 null이다', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/activity/recap')
+      .query({ at: '2001-03-05T00:00:00Z' })
+      .expect(200);
+    expect(res.body).toEqual({ recap: null });
+  });
+
+  it('작업용 앱의 사용 흔적만 작업 블록과 요약에 들어간다', async () => {
+    const post = (activeApp: string, windowTitle: string, observedAt: string) =>
+      request(app.getHttpServer())
+        .post('/usage')
+        .send({ activeApp, windowTitle, observedAt })
+        .expect(201);
+    // 한국 시간 2001-03-12 10:00~10:20
+    await post('Code', 'main.ts', '2001-03-12T01:00:00Z');
+    await post('Code', 'app.module.ts', '2001-03-12T01:05:00Z');
+    await post('Google Chrome', 'NestJS 문서', '2001-03-12T01:10:00Z');
+    // 작업용 앱이 아니라 저장만 되고 집계에서는 빠진다.
+    await post('Music', '재생 목록', '2001-03-12T01:20:00Z');
+    await post('Music', '재생 목록', '2001-03-12T03:00:00Z');
+
+    const range = await request(app.getHttpServer())
+      .get('/activity/range')
+      .query({ from: '2001-03-12', to: '2001-03-12' })
+      .expect(200);
+    expect(ActivityRangeSchema.parse(range.body).blocks).toEqual([
+      { date: '2001-03-12', index: 20, sources: ['usage'] },
+    ]);
+
+    const res = await request(app.getHttpServer())
+      .get('/activity/recap')
+      .query({ at: '2001-03-12T04:00:00Z' })
+      .expect(200);
+    expect(ActivityRecapResponseSchema.parse(res.body).recap).toEqual({
+      startedAt: '2001-03-12T01:00:00.000Z',
+      endedAt: '2001-03-12T01:10:00.000Z',
+      commits: 0,
+      captures: 0,
+      lastCommit: null,
+      lastContext: { activeApp: 'Google Chrome', windowTitle: 'NestJS 문서' },
+    });
+  });
+
+  it('observedAt을 보내지 않은 사용 흔적은 받은 시각으로 저장한다', async () => {
+    const before = Date.now();
+    const res = await request(app.getHttpServer())
+      .post('/usage')
+      .send({ activeApp: 'e2e-probe', windowTitle: null })
+      .expect(201);
+    await dataSource.query(`DELETE FROM app_usage WHERE id = $1`, [
+      res.body.id,
+    ]);
+    const observedAt = Date.parse(res.body.observedAt);
+    expect(observedAt).toBeGreaterThanOrEqual(before - 1000);
+    expect(observedAt).toBeLessThanOrEqual(Date.now() + 1000);
+  });
+
+  it('앱 이름이 없는 사용 흔적은 400으로 거부한다', async () => {
+    await request(app.getHttpServer())
+      .post('/usage')
+      .send({ activeApp: '', observedAt: '2001-03-12T01:00:00Z' })
+      .expect(400);
+  });
+
   it('동기화하면 커밋을 저장하고, 다시 해도 중복 저장하지 않는다', async () => {
+    // 복귀 요약도 조회 전에 동기화를 돌리므로, 앞선 테스트가 넣은 것을 지우고 시작한다.
+    await dataSource.query(
+      `DELETE FROM repos WHERE github_full_name = 'e2e-test/synced'`,
+    );
+
     const first = await request(app.getHttpServer())
       .post('/github/sync')
       .expect(200);

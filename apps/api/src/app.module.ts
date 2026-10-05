@@ -7,6 +7,7 @@ import { CapturesModule } from './captures/captures.module.js';
 import { dataSourceOptions } from './database/data-source.js';
 import { GithubModule } from './github/github.module.js';
 import { HealthController } from './health.controller.js';
+import { UsageModule } from './usage/usage.module.js';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { HealthController } from './health.controller.js';
     CapturesModule,
     GithubModule,
     ActivityModule,
+    UsageModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

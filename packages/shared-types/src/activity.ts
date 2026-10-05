@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
-// 작업 흔적의 출처. Notion 편집은 동기화가 붙을 때 추가한다.
-export const ActivitySourceSchema = z.enum(['github', 'capture']);
+// 작업 흔적의 출처. usage는 작업용 앱을 쓰고 있던 사용 흔적이다.
+// Notion 편집은 동기화가 붙을 때 추가한다.
+export const ActivitySourceSchema = z.enum(['github', 'capture', 'usage']);
 export type ActivitySource = z.infer<typeof ActivitySourceSchema>;
 
 // 하루를 30분 칸 48개로 나눈 것 중 흔적이 있는 칸 ("작업 블록")
@@ -98,3 +99,35 @@ export const ActivityRangeQuerySchema = z
     { path: ['to'], error: `기간은 최대 ${MAX_RANGE_DAYS}일입니다` },
   );
 export type ActivityRangeQuery = z.infer<typeof ActivityRangeQuerySchema>;
+
+// 가장 최근에 이어서 작업한 구간 ("떠나기 전에 뭘 하고 있었나").
+// 흔적 사이가 30분 넘게 벌어지지 않은 연속 구간 하나를 말한다.
+export const ActivityRecapSchema = z.object({
+  startedAt: z.iso.datetime({ offset: true }),
+  // 마지막 흔적이 남은 시각
+  endedAt: z.iso.datetime({ offset: true }),
+  commits: z.number().int(),
+  captures: z.number().int(),
+  // 그 구간의 마지막 커밋
+  lastCommit: RecentCommitSchema.nullable(),
+  // 그 구간에서 마지막으로 기록된, 쓰고 있던 앱 (캡처 또는 사용 흔적)
+  lastContext: z
+    .object({
+      activeApp: z.string(),
+      windowTitle: z.string().nullable(),
+    })
+    .nullable(),
+});
+export type ActivityRecap = z.infer<typeof ActivityRecapSchema>;
+
+// 최근 12시간 안에 흔적이 없으면 recap은 null
+export const ActivityRecapResponseSchema = z.object({
+  recap: ActivityRecapSchema.nullable(),
+});
+export type ActivityRecapResponse = z.infer<typeof ActivityRecapResponseSchema>;
+
+// GET /activity/recap 쿼리. at을 생략하면 지금 기준.
+export const ActivityRecapQuerySchema = z.object({
+  at: z.iso.datetime({ offset: true }).optional(),
+});
+export type ActivityRecapQuery = z.infer<typeof ActivityRecapQuerySchema>;

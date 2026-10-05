@@ -19,6 +19,8 @@ use crate::idle::duration_from_env;
 const DEFAULT_INTERVAL: Duration = Duration::from_secs(60);
 /// 웹뷰의 `VITE_API_URL` 기본값과 같다. `ADHD_API_URL`로 바꾼다.
 const DEFAULT_API_URL: &str = "http://localhost:4000";
+/// API에 보내는 키. 빌드할 때 build.rs가 apps/desktop/.env에서 읽어 넣는다.
+const API_KEY: &str = env!("ADHD_API_KEY");
 /// API가 응답하지 않아도 다음 주기를 밀지 않도록 짧게 끊는다.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -73,7 +75,11 @@ pub fn spawn_recorder() {
                 window_title: frontmost.window_title,
             };
             // API가 꺼져 있으면 그 주기는 그냥 빠진다.
-            match agent.post(&url).send_json(&usage) {
+            match agent
+                .post(&url)
+                .header("x-api-key", API_KEY)
+                .send_json(&usage)
+            {
                 Ok(_) => eprintln!(
                     "[usage] 저장: 앱 {:?} / 창 제목 {:?}",
                     usage.active_app, usage.window_title

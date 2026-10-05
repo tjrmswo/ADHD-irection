@@ -1,5 +1,5 @@
 import { CaptureListSchema, type Capture } from "@adhd-irection/shared-types";
-import { API_URL } from "./api";
+import { apiFetch } from "./api";
 
 /** after(포함)부터 before(제외)까지의 캡처를 최신순으로. */
 export async function fetchCaptures(query: {
@@ -13,9 +13,7 @@ export async function fetchCaptures(query: {
     before: query.before,
   });
 
-  const res = await fetch(`${API_URL}/captures?${params}`, {
-    cache: "no-store",
-  });
+  const res = await apiFetch(`/captures?${params}`);
   if (!res.ok) throw new Error(`캡처 조회 실패 (${res.status})`);
   return CaptureListSchema.parse(await res.json());
 }

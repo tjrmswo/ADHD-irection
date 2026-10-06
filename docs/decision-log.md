@@ -495,12 +495,13 @@ Claude Design 캔버스(`ADHD-irection 리디자인`, 화면 5개: 오늘 / 이�
 
 기획(15절, tech-stack)대로 웹은 Vercel, API는 Railway, DB는 Neon. 단계별 안내는 `docs/deploy.md`.
 
-- **API는 Dockerfile로**: Railway의 자동 빌드에 맡기지 않고 `apps/api/Dockerfile`을 둠. 모노레포에서 `shared-types`를 빌드 없이 `.ts`로 읽는 구조라 Node 24가 필요하고, 어떤 파일이 이미지에 들어가는지 직접 정하는 편이 안전함. 맥에서 같은 이미지를 띄워볼 수 있다는 점도 이유
+- **API는 Dockerfile로**: Railway의 자동 빌드에 맡기지 않고 Dockerfile을 둠 (처음에는 `apps/api/Dockerfile` + `railway.json`이었으나 아래 "첫 배포에서 겪은 문제"로 루트의 `Dockerfile`로 옮김). 모노레포에서 `shared-types`를 빌드 없이 `.ts`로 읽는 구조라 Node 24가 필요하고, 어떤 파일이 이미지에 들어가는지 직접 정하는 편이 안전함. 맥에서 같은 이미지를 띄워볼 수 있다는 점도 이유
 - **뜰 때 마이그레이션 실행**: 지금까지는 `pnpm db:migrate`로만 돌렸으나(18절), 배포에서는 컨테이너 시작 명령에서 먼저 돌림. 이미 적용된 것은 건너뛰고, 실패하면 서버를 띄우지 않음. 손으로 돌리는 단계를 두면 빼먹었을 때 새 코드가 옛 표 구조 위에서 뜸
 - **이미지에 비밀 값이 들어가지 않게**: `.dockerignore`로 모든 `.env`를 제외. 빌드한 이미지 안에 `.env`가 없는 것을 확인함. 값은 Railway의 환경변수로만 넣음
 - **배포용 키는 새로**: `SESSION_SECRET`과 `DESKTOP_API_KEY`는 로컬과 다른 값을 새로 만듦. 로컬 값이 새도 배포가 영향받지 않게
 - **데스크톱 앱의 주소**: 배포용 빌드는 `apps/desktop/.env.production`을, 개발 빌드는 `.env`를 읽음 (Vite의 규칙과 같게 `build.rs`도 맞춤). 개발은 로컬 API, 배포용 앱은 배포한 API를 봄. 실행 시 `ADHD_API_URL` 환경변수가 있으면 그것이 우선
 - **로컬 데이터는 한 번 옮김**: 캡처·사용 흔적·주인 등록은 로컬 DB에만 있으므로 데이터만 내보내 Neon에 넣음. 표 구조는 마이그레이션이 만들게 해서 두 곳의 구조가 어긋나지 않게 함
+- **첫 배포에서 겪은 문제**: `railway.json`으로 Dockerfile 위치를 알려줬는데 Railway가 이를 무시하고 기본 빌더(Railpack)로 루트의 `pnpm start`를 실행해 `docker: not found`로 죽음. Railway의 설정 화면에 "Config as Code is deprecated … services that have never used Config as Code cannot opt in"라고 나옴 — 새 서비스는 설정 파일을 쓸 수 없게 바뀐 것. 그래서 `railway.json`을 지우고 Dockerfile을 **저장소 루트**로 옮김 (Railway는 루트의 `Dockerfile`을 자동으로 감지). 상태 확인 경로와 지역은 대시보드에서 직접 설정
 - **맥에서 미리 확인한 것**: 이미지를 빌드해 빈 DB에 연결 → 마이그레이션 7개가 처음부터 실행되고 `/health` 정상, 키 없는 요청은 401, 키가 있으면 조회와 캡처 저장 성공. 웹의 배포용 빌드 통과
 
 ---

@@ -17,8 +17,10 @@ use crate::idle::duration_from_env;
 /// "마지막 흔적 시각"과 "보던 화면"이 이 주기만큼 어긋나므로 짧게 둔다.
 /// 하루 10시간을 써도 600행이라 저장 부담은 없다.
 const DEFAULT_INTERVAL: Duration = Duration::from_secs(60);
-/// 웹뷰의 `VITE_API_URL` 기본값과 같다. `ADHD_API_URL`로 바꾼다.
+/// 웹뷰의 `VITE_API_URL` 기본값과 같다.
 const DEFAULT_API_URL: &str = "http://localhost:4000";
+/// 빌드할 때 build.rs가 .env 파일의 `VITE_API_URL`에서 읽어 넣는 API 주소 (없으면 빈 문자열).
+const BUILT_IN_API_URL: &str = env!("ADHD_API_URL");
 /// API에 보내는 키. 빌드할 때 build.rs가 apps/desktop/.env에서 읽어 넣는다.
 const API_KEY: &str = env!("ADHD_API_KEY");
 /// API가 응답하지 않아도 다음 주기를 밀지 않도록 짧게 끊는다.
@@ -42,8 +44,16 @@ fn interval() -> Duration {
     duration_from_env("ADHD_USAGE_INTERVAL_SECS", DEFAULT_INTERVAL)
 }
 
+/// 실행할 때의 `ADHD_API_URL` 환경변수 > 빌드할 때 넣은 주소 > localhost 순으로 고른다.
+fn api_base(runtime: Option<String>, built_in: &str) -> String {
+    runtime
+        .filter(|url| !url.is_empty())
+        .or_else(|| (!built_in.is_empty()).then(|| built_in.to_string()))
+        .unwrap_or_else(|| DEFAULT_API_URL.to_string())
+}
+
 fn usage_url() -> String {
-    let base = std::env::var("ADHD_API_URL").unwrap_or_else(|_| DEFAULT_API_URL.to_string());
+    let base = api_base(std::env::var("ADHD_API_URL").ok(), BUILT_IN_API_URL);
     format!("{}/usage", base.trim_end_matches('/'))
 }
 
@@ -106,6 +116,18 @@ mod tests {
         let interval = Duration::from_secs(60);
         assert!(!was_present(Duration::from_secs(60), interval));
         assert!(!was_present(Duration::from_secs(3600), interval));
+    }
+
+    #[test]
+    fn api_주소는_실행_환경변수_빌드에_넣은_값_localhost_순으로_고른다() {
+        let deployed = "https://api.example.com";
+        assert_eq!(
+            api_base(Some("http://override".into()), deployed),
+            "http://override"
+        );
+        assert_eq!(api_base(None, deployed), deployed);
+        assert_eq!(api_base(Some(String::new()), deployed), deployed);
+        assert_eq!(api_base(None, ""), DEFAULT_API_URL);
     }
 
     #[test]

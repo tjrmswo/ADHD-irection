@@ -26,7 +26,7 @@
 
 핵심 기획(작업 흔적 표시 + 작은 보상)의 단계 — `docs/decision-log.md` 23절:
 
-1. 배포 (Vercel + Railway + Neon) — 인증 관련 환경변수와 카카오 Redirect URI를 실제 주소로 (`docs/decision-log.md` 29절)
+1. 배포 (Vercel + Railway + Neon) — 코드 쪽 준비는 끝남(`apps/api/Dockerfile`, `railway.json`, 데스크톱 `.env.production`). 남은 것은 각 서비스에서 레포 연결과 환경변수 입력. 순서는 `docs/deploy.md`
 2. API 배포 후 GitHub/Notion 웹훅 전환
 3. 음성 메모 캡처 + 비동기 STT
 

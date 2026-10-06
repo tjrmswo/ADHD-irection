@@ -24,8 +24,10 @@
 ### 2. Railway — API 서버
 
 1. https://railway.com 에서 **New Project → Deploy from GitHub repo**로 이 레포를 고른다.
-2. 빌드 설정은 건드리지 않는다. 레포 루트의 `railway.json`이 `apps/api/Dockerfile`로 빌드하고 `/health`로 상태를 확인하게 해 둔다.
-3. **Variables**에 아래 값을 넣는다.
+2. 빌드 설정은 건드리지 않는다. 레포 루트에 `Dockerfile`이 있어서 Railway가 자동으로 그것으로 빌드한다. Settings → Build의 Builder가 **Dockerfile**로 표시되는지만 확인한다 (Railpack으로 나오면 루트의 `pnpm start`가 실행돼 `docker: not found`로 죽는다).
+3. Settings → Deploy → **Healthcheck Path**에 `/health`를 넣는다 (서버가 실제로 응답할 때까지 새 배포로 넘어가지 않게 한다).
+4. Settings → Scale에서 지역을 **Southeast Asia (Singapore)** 로 바꾼다. DB가 싱가포르에 있다.
+5. **Variables**에 아래 값을 넣는다. 넣은 뒤 화면 위쪽의 **Deploy**를 눌러야 적용된다.
 
 | 이름 | 값 |
 |---|---|
@@ -39,8 +41,8 @@
 | `GITHUB_TOKEN` | GitHub 개인 액세스 토큰 (private 레포를 읽으려면 `repo` 권한) |
 | `NOTION_TOKEN` | Notion 통합의 내부 시크릿 |
 
-4. **Settings → Networking → Generate Domain**으로 공개 주소를 만든다. 이것이 `<Railway 주소>`다.
-5. 배포가 끝나면 `https://<Railway 주소>/health`가 `{"status":"ok","db":"up"}`을 돌려주는지 확인한다.
+6. **Settings → Networking → Generate Domain**으로 공개 주소를 만든다. 이것이 `<Railway 주소>`다.
+7. 배포가 끝나면 `https://<Railway 주소>/health`가 `{"status":"ok","db":"up"}`을 돌려주는지 확인한다.
 
 `GITHUB_TOKEN`은 로컬에서 쓰던 `gh auth token` 값 대신, GitHub 설정에서 따로 만든 토큰을 쓴다. gh 명령의 토큰은 그 명령에서 로그아웃하면 못 쓰게 된다.
 
@@ -116,6 +118,7 @@ open apps/desktop/src-tauri/target/release/bundle/macos/ADHD-irection.app
 | 증상 | 볼 곳 |
 |---|---|
 | Railway 배포가 실패 | Deploy Logs. 마이그레이션이 실패하면 서버가 뜨지 않게 해 두었다 |
+| 로그에 `docker: not found` | Dockerfile이 아니라 Railpack으로 빌드된 것. Builder 설정과 루트의 `Dockerfile` 존재를 확인 |
 | 로그인 버튼을 누르면 카카오 오류 (KOE006 등) | 카카오 콘솔의 Redirect URI가 `KAKAO_REDIRECT_URI`와 글자 하나까지 같은지 |
 | 로그인 후 다시 로그인 화면 | Railway의 `WEB_URL`이 Vercel 주소와 같은지, Vercel의 `API_URL`이 Railway 주소인지 |
 | "이 앱의 주인으로 등록된 카카오 계정이 아니에요" | 다른 계정이 먼저 주인으로 등록됨. Neon에서 `UPDATE users SET kakao_id = NULL` 후 본인이 다시 로그인 |

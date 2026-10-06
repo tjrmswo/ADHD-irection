@@ -1,5 +1,6 @@
-# API 서버 이미지 (Railway가 이 파일로 빌드한다). 저장소 루트를 기준으로 빌드해야 한다:
-#   docker build -f apps/api/Dockerfile .
+# API 서버 이미지. Railway는 저장소 루트에 Dockerfile이 있으면 자동으로 이 파일로 빌드한다
+# (없으면 루트의 `pnpm start`, 즉 개발용 명령을 실행해 버린다). 그래서 apps/api가 아니라 루트에 둔다.
+#   docker build -t adhd-irection-api .
 # shared-types는 빌드 없이 .ts를 그대로 읽으므로 Node 24(타입 스트리핑)가 필요하다.
 FROM node:24-slim
 
